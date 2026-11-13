@@ -1,0 +1,38 @@
+services:
+  collander:
+    build: .
+    image: collander:latest
+    container_name: collander
+    restart: unless-stopped
+    ports:
+      - "${COLLANDER_PORT:-8080}:8000"
+    volumes:
+      - collander-data:/data
+    environment:
+      # Everything is optional; see .env.example. Values come from a .env file next to this one.
+      COLLANDER_PASSWORD: ${COLLANDER_PASSWORD:-}
+      COLLANDER_SECURE_COOKIES: ${COLLANDER_SECURE_COOKIES:-false}
+      COLLANDER_QUEUE_WORKERS: ${COLLANDER_QUEUE_WORKERS:-2}
+      COLLANDER_AI_PROVIDER: ${COLLANDER_AI_PROVIDER:-none}
+      COLLANDER_AI_MODEL: ${COLLANDER_AI_MODEL:-}
+      COLLANDER_ANTHROPIC_API_KEY: ${COLLANDER_ANTHROPIC_API_KEY:-}
+      COLLANDER_OPENAI_API_KEY: ${COLLANDER_OPENAI_API_KEY:-}
+      COLLANDER_OPENAI_BASE_URL: ${COLLANDER_OPENAI_BASE_URL:-}
+      COLLANDER_GOOGLE_API_KEY: ${COLLANDER_GOOGLE_API_KEY:-}
+      COLLANDER_OLLAMA_BASE_URL: ${COLLANDER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    # Lets the container reach Ollama running on the host (needed on Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Optional: run Ollama alongside Collander. Start with `docker compose --profile ollama up -d`,
+  # then set the Ollama address in Settings to http://ollama:11434
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+
+volumes:
+  collander-data:
+  ollama-models:

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Collander">
+  <title>Collander</title>
+  <rect width="512" height="512" rx="112" fill="#2457B0"/>
+  <!-- steam / rinse droplets -->
+  <path d="M206 92c0 0-16 22-16 34a16 16 0 0 0 32 0c0-12-16-34-16-34z" fill="#9CC0FF"/>
+  <path d="M306 72c0 0-13 18-13 28a13 13 0 0 0 26 0c0-10-13-28-13-28z" fill="#9CC0FF"/>
+  <!-- foot ring -->
+  <rect x="186" y="384" width="140" height="34" rx="12" fill="#14213D"/>
+  <!-- bowl -->
+  <path d="M92 212h328c0 112-70 184-164 184S92 324 92 212z" fill="#F6F7F4"/>
+  <!-- handles -->
+  <rect x="34" y="190" width="92" height="40" rx="20" fill="none" stroke="#14213D" stroke-width="18"/>
+  <rect x="386" y="190" width="92" height="40" rx="20" fill="none" stroke="#14213D" stroke-width="18"/>
+  <!-- rolled rim -->
+  <rect x="74" y="186" width="364" height="48" rx="24" fill="#14213D"/>
+  <!-- holes -->
+  <g fill="#2457B0">
+    <circle cx="160" cy="270" r="14"/><circle cx="208" cy="270" r="14"/><circle cx="256" cy="270" r="14"/>
+    <circle cx="304" cy="270" r="14"/><circle cx="352" cy="270" r="14"/>
+    <circle cx="184" cy="314" r="13"/><circle cx="232" cy="314" r="13"/><circle cx="280" cy="314" r="13"/>
+    <circle cx="328" cy="314" r="13"/>
+    <circle cx="220" cy="354" r="11"/><circle cx="256" cy="354" r="11"/><circle cx="292" cy="354" r="11"/>
+  </g>
+</svg>
