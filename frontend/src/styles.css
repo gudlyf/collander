@@ -1200,3 +1200,134 @@ body {
     font-size: 2.2rem;
   }
 }
+
+/* ---------- Library: view toggle + list view ---------- */
+
+.view-toggle {
+  display: inline-flex;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 2px;
+  background: var(--surface);
+}
+.view-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--r-pill);
+  padding: 5px 9px;
+  cursor: pointer;
+  display: inline-flex;
+}
+.view-toggle button svg {
+  width: 18px;
+  height: 18px;
+}
+.view-toggle button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.recipe-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.list-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+.list-row:hover {
+  background: var(--sunken);
+}
+.list-thumb {
+  width: 64px;
+  height: 48px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--sunken);
+}
+.list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.list-thumb .placeholder {
+  font-size: 1.3rem;
+  background-size: 11px 9px, 15px 13px;
+}
+.list-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.list-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.list-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list-fav {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+.list-tags,
+.list-row .snippet {
+  font-size: 0.85rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list-row .snippet {
+  font-family: var(--font-text);
+  color: var(--ink-2);
+}
+.list-row .snippet mark {
+  background: var(--cobalt-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.list-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.list-rating {
+  color: #e0a100;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+@media (max-width: 600px) {
+  .list-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .list-thumb {
+    width: 52px;
+    height: 52px;
+  }
+  .list-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .list-meta:empty {
+    display: none;
+  }
+}

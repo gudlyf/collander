@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, imageUrl, type RecipeList, type RecipeSummary } from "../api";
-import { HeartIcon, SearchIcon } from "../components/icons";
+import { GridIcon, HeartIcon, ListIcon, SearchIcon } from "../components/icons";
 import { useTags } from "../hooks";
 
 const PAGE = 48;
@@ -22,6 +22,69 @@ export function Thumb({ title, image }: { title: string; image: string | null })
   const src = imageUrl(image);
   if (src) return <img src={src} alt="" loading="lazy" />;
   return <div className="placeholder">{title.trim().charAt(0).toUpperCase() || "?"}</div>;
+}
+
+type View = "cards" | "list";
+const VIEW_KEY = "collander:library-view";
+
+function loadView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "cards";
+  } catch {
+    return "cards";
+  }
+}
+
+function saveView(v: View) {
+  try {
+    localStorage.setItem(VIEW_KEY, v);
+  } catch {
+    /* storage unavailable; the choice just won't be remembered */
+  }
+}
+
+function ViewToggle({ view, setView }: { view: View; setView: (v: View) => void }) {
+  return (
+    <div className="view-toggle" role="group" aria-label="Show recipes as">
+      <button aria-pressed={view === "cards"} onClick={() => setView("cards")} title="Cards" aria-label="Cards">
+        <GridIcon />
+      </button>
+      <button aria-pressed={view === "list"} onClick={() => setView("list")} title="List" aria-label="List">
+        <ListIcon />
+      </button>
+    </div>
+  );
+}
+
+function Row({ r }: { r: RecipeSummary }) {
+  return (
+    <li>
+      <Link to={`/r/${r.id}`} className="list-row">
+        <div className="list-thumb">
+          <Thumb title={r.title} image={r.image} />
+        </div>
+        <div className="list-main">
+          <div className="list-title">
+            {r.favorite && <HeartIcon filled className="list-fav" width={15} height={15} aria-label="Favorite" />}
+            <span>{r.title}</span>
+          </div>
+          {r.snippet ? (
+            <div className="snippet">
+              <Highlight text={r.snippet.replace(/\n/g, " · ")} />
+            </div>
+          ) : r.tags.length ? (
+            <div className="list-tags">{r.tags.slice(0, 5).join(" · ")}</div>
+          ) : null}
+        </div>
+        <div className="list-meta">
+          {r.needs_review && <span className="badge review">Needs review</span>}
+          {r.has_modifications && <span className="badge mod">Modified</span>}
+          {r.rating ? <span className="list-rating" aria-label={`${r.rating} stars`}>{"★".repeat(r.rating)}</span> : null}
+          {r.total_time && <span className="small muted">{r.total_time}</span>}
+        </div>
+      </Link>
+    </li>
+  );
 }
 
 function Card({ r }: { r: RecipeSummary }) {
@@ -58,6 +121,11 @@ export default function Library() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [view, setViewState] = useState<View>(loadView);
+  const setView = (v: View) => {
+    setViewState(v);
+    saveView(v);
+  };
   const tags = useTags();
 
   useEffect(() => setInput(q), [q]);
@@ -179,6 +247,8 @@ export default function Library() {
               </>
             ) : null}
           </span>
+          <div className="row">
+          <ViewToggle view={view} setView={setView} />
           <label className="row small">
             Sort
             <select
@@ -197,6 +267,7 @@ export default function Library() {
               <option value="rating">Rating</option>
             </select>
           </label>
+          </div>
         </div>
       </div>
 
@@ -224,11 +295,19 @@ export default function Library() {
           </div>
         )
       ) : (
-        <div className="grid">
-          {items.map((r) => (
-            <Card key={r.id} r={r} />
-          ))}
-        </div>
+        view === "list" ? (
+          <ul className="recipe-list">
+            {items.map((r) => (
+              <Row key={r.id} r={r} />
+            ))}
+          </ul>
+        ) : (
+          <div className="grid">
+            {items.map((r) => (
+              <Card key={r.id} r={r} />
+            ))}
+          </div>
+        )
       )}
       {items.length < total && (
         <div className="row" style={{ justifyContent: "center", marginTop: 30 }}>
