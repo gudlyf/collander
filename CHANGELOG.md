@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 1.0.0 (2026-11-13)
 
 First release.
 
@@ -13,4 +13,5 @@ First release.
 - Optional AI check: tidies formatting and flags problems without changing quantities or wording.
 - AI providers: Anthropic, OpenAI and compatible servers, Google Gemini, Ollama.
 - Single-password sign-in, JSON backup and restore, CLI tools.
-- Docker image and Compose file.
+- Multi-architecture Docker image (`linux/amd64`, `linux/arm64`) published to `ghcr.io/gudlyf/collander`, and a Compose file.
+- Recipe library in card or list view.

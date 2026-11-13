@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Frontend build ---------------------------------------------------------
-FROM node:22-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund

@@ -28,25 +28,51 @@
 
 ## Quick start (Docker Compose)
 
+Images for `linux/amd64` and `linux/arm64` are published to `ghcr.io/gudlyf/collander`.
+
 ```bash
-git clone <your-fork-or-this-repo> collander
-cd collander
-cp .env.example .env        # optional: edit to taste
-docker compose up -d --build
+mkdir collander && cd collander
+curl -fsSLO https://raw.githubusercontent.com/gudlyf/collander/main/compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/gudlyf/collander/main/.env.example   # optional: edit to taste
+docker compose up -d
 ```
 
 Open <http://localhost:8080>, choose a password, and you're in. To use AI imports, open **Settings → AI model** and pick a provider.
 
-Data is stored in the `collander-data` Docker volume. To keep it in a folder instead, change the volume line in `docker-compose.yml` to `- ./data:/data` and make sure the folder is writable by UID 1000.
+Data is stored in the `collander-data` Docker volume. To keep it in a folder instead, change the volume line in `compose.yaml` to `- ./data:/data` and make sure the folder is writable by UID 1000.
+
+Prefer plain `docker run`?
+
+```bash
+docker run -d --name collander -p 8080:8000 -v collander-data:/data \
+  --add-host host.docker.internal:host-gateway \
+  ghcr.io/gudlyf/collander:latest
+```
+
+### Image tags
+
+| Tag | What it is |
+| --- | --- |
+| `latest` | The newest release |
+| `1`, `1.0`, `1.0.0` | A release line or exact release; set `COLLANDER_VERSION` in `.env` to pin one |
+| `edge` | The current `main` branch |
 
 ### Updating
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Database migrations run automatically on start.
+Database migrations run automatically on start. Take a backup (Settings → Backup) before moving to a new major version.
+
+### Building from source
+
+```bash
+git clone https://github.com/gudlyf/collander.git
+cd collander
+docker compose up -d --build
+```
 
 ## Configuration
 

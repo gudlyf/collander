@@ -96,3 +96,11 @@ Implement `complete_json(system, user, schema, name, images=None) -> dict` in `b
 - Screenshots help for UI changes.
 
 By contributing, you agree that your contributions are licensed under the MIT License.
+
+## Releases
+
+1. Update the version in `backend/pyproject.toml`, `backend/app/__init__.py` and `frontend/package.json` (`npm version X.Y.Z --no-git-tag-version`), then run `uv lock` in `backend/`.
+2. Add a section to `CHANGELOG.md`.
+3. Commit, then tag and push: `git tag -a vX.Y.Z -m "Collander X.Y.Z" && git push origin vX.Y.Z`.
+
+Pushing the tag builds the multi-architecture image and publishes it to `ghcr.io/gudlyf/collander` with the `X.Y.Z`, `X.Y`, `X` and `latest` tags. Every push to `main` publishes `edge`.
