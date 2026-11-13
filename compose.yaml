@@ -12,7 +12,8 @@ services:
     ports:
       - "${COLLANDER_PORT:-8080}:8000"
     volumes:
-      - collander-data:/data
+      # Named volume by default. Set COLLANDER_DATA_VOLUME=./data in .env to use a folder instead.
+      - ${COLLANDER_DATA_VOLUME:-collander-data}:/data
     environment:
       # Everything is optional; see .env.example. Values come from a .env file next to this one.
       COLLANDER_PASSWORD: ${COLLANDER_PASSWORD:-}

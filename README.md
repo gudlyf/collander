@@ -39,7 +39,12 @@ docker compose up -d
 
 Open <http://localhost:8080>, choose a password, and you're in. To use AI imports, open **Settings → AI model** and pick a provider.
 
-Data is stored in the `collander-data` Docker volume. To keep it in a folder instead, change the volume line in `compose.yaml` to `- ./data:/data` and make sure the folder is writable by UID 1000.
+Data is stored in the `collander-data` Docker volume. To keep it in a folder next to `compose.yaml` instead, create the folder and add one line to `.env`:
+
+```bash
+mkdir -p data && sudo chown 1000:1000 data    # the container runs as UID 1000
+echo "COLLANDER_DATA_VOLUME=./data" >> .env
+```
 
 Prefer plain `docker run`?
 
@@ -81,6 +86,7 @@ All settings are optional environment variables (put them in `.env`). AI setting
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `COLLANDER_PORT` | `8080` | Host port (compose only) |
+| `COLLANDER_DATA_VOLUME` | `collander-data` | Docker volume name or host folder for data, e.g. `./data` (compose only) |
 | `COLLANDER_PASSWORD` | – | Login password. If unset, you choose one on first visit. |
 | `COLLANDER_SECURE_COOKIES` | `false` | Set `true` when served over HTTPS |
 | `COLLANDER_SESSION_DAYS` | `30` | How long a sign-in lasts |
