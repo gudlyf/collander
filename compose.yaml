@@ -2,7 +2,11 @@ services:
   collander:
     # Pulls the published image. To build from this checkout instead: docker compose up -d --build
     image: ghcr.io/gudlyf/collander:${COLLANDER_VERSION:-latest}
-    build: .
+    build:
+      context: .
+      args:
+        # Optional: COLLANDER_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+        COLLANDER_COMMIT: ${COLLANDER_COMMIT:-}
     container_name: collander
     restart: unless-stopped
     ports:

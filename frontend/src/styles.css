@@ -1331,3 +1331,17 @@ body {
     display: none;
   }
 }
+
+/* Settings → About */
+.about {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+.about dt {
+  color: var(--ink-2);
+}
+.about dd {
+  margin: 0;
+}

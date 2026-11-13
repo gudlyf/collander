@@ -30,7 +30,10 @@ COPY --from=frontend /src/dist ./static
 RUN useradd --create-home --uid 1000 collander \
     && mkdir -p /data && chown collander:collander /data
 
-ENV COLLANDER_DATA_DIR=/data \
+# Set by the release workflow; shown on the Settings page.
+ARG COLLANDER_COMMIT=""
+ENV COLLANDER_COMMIT=${COLLANDER_COMMIT} \
+    COLLANDER_DATA_DIR=/data \
     COLLANDER_STATIC_DIR=/app/static
 
 USER collander

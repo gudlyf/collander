@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type AISettings, type AuthStatus } from "../api";
+import { api, type AISettings, type AuthStatus, type BuildInfo } from "../api";
 import { useApi } from "../hooks";
 import { JobProgress } from "./Import";
 
@@ -247,6 +247,38 @@ function PasswordForm({ fromEnv }: { fromEnv: boolean }) {
   );
 }
 
+const REPO = "https://github.com/gudlyf/collander";
+
+function About() {
+  const { data } = useApi<BuildInfo>("/health");
+  if (!data) return null;
+  const sha = data.commit;
+  return (
+    <div className="panel stack">
+      <h2>About</h2>
+      <dl className="about">
+        <dt>Version</dt>
+        <dd>{data.version}</dd>
+        <dt>Commit</dt>
+        <dd>
+          {sha ? (
+            <a href={`${REPO}/commit/${sha}`} target="_blank" rel="noreferrer" title={sha}>
+              <code>{sha.slice(0, 7)}</code>
+            </a>
+          ) : (
+            <span className="muted">Not recorded in this build</span>
+          )}
+        </dd>
+      </dl>
+      <p className="muted small">
+        <a href={REPO} target="_blank" rel="noreferrer">
+          Source code and release notes
+        </a>
+      </p>
+    </div>
+  );
+}
+
 export default function Settings({ auth }: { auth: AuthStatus }) {
   return (
     <div className="stack" style={{ maxWidth: 720, gap: 24 }}>
@@ -278,6 +310,7 @@ export default function Settings({ auth }: { auth: AuthStatus }) {
         </div>
       </div>
       <PasswordForm fromEnv={auth.password_from_env} />
+      <About />
       <div>
         <button
           className="btn ghost"

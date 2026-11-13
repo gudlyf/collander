@@ -1,5 +1,11 @@
 // Typed client for the Collander REST API.
 
+export interface BuildInfo {
+  status: string;
+  version: string;
+  commit: string | null;
+}
+
 export interface IngredientIn {
   text: string;
   section?: string | null;

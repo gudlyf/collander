@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import __version__
+from . import __version__, commit
 from .auth import require_auth
 from .config import get_settings
 from .migrate import upgrade_db
@@ -63,7 +63,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "version": __version__}
+        return {"status": "ok", "version": __version__, "commit": commit()}
 
     @app.get("/api/images/{name}", dependencies=[Depends(require_auth)])
     def get_image(name: str):

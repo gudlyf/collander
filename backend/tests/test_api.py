@@ -215,3 +215,20 @@ def test_enex_rerun_with_ai_skips_before_calling_ai(client, fake_ai):
     assert first["imported"] == 1, first["log"]
     assert second["imported"] == 0, second["log"]
     assert len(fake_ai) == calls_after_first  # no AI calls for the duplicate
+
+
+def test_health_reports_version_and_commit(client, monkeypatch):
+    from app import __version__, commit
+
+    commit.cache_clear()
+    monkeypatch.setenv("COLLANDER_COMMIT", "0123456789abcdef0123456789abcdef01234567")
+    try:
+        r = client.get("/api/health")
+        assert r.status_code == 200
+        assert r.json() == {
+            "status": "ok",
+            "version": __version__,
+            "commit": "0123456789abcdef0123456789abcdef01234567",
+        }
+    finally:
+        commit.cache_clear()
