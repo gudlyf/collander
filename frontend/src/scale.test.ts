@@ -8,6 +8,7 @@ describe("parseNumber", () => {
     ["1,5", 1.5],
     ["1/2", 0.5],
     ["1 1/2", 1.5],
+    ["1-1/2", 1.5],
     ["½", 0.5],
     ["1½", 1.5],
     ["1 ½", 1.5],
@@ -34,6 +35,11 @@ describe("scaleLine", () => {
     expect(scaleLine("1/2 tsp salt", 2).text).toBe("1 tsp salt");
     expect(scaleLine("1 1/2 lb tomatoes", 2).text).toBe("3 lb tomatoes");
     expect(scaleLine("½ cup sugar", 3).text).toBe("1½ cup sugar");
+  });
+  it("treats hyphenated mixed numbers as one quantity", () => {
+    expect(scaleLine("1-1/2 cups flour", 2).text).toBe("3 cups flour");
+    expect(scaleLine("2-1/4 tsp yeast", 2).text).toBe("4½ tsp yeast");
+    expect(scaleLine("1-2 tsp chili flakes", 2).text).toBe("2-4 tsp chili flakes");
   });
   it("halves", () => {
     expect(scaleLine("3 eggs", 0.5).text).toBe("1½ eggs");

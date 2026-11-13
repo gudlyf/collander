@@ -142,3 +142,25 @@ def test_queue_text_and_photo_with_fake_ai(client, fake_ai):
     assert photo_rec["image"] and photo_rec["source_kind"] == "photo"
     assert any(c["images"] for c in fake_ai)
     assert client.get(f"/api/queue/{photo_id}/photos/0").status_code == 200
+
+
+def test_duplicate_detection_needs_matching_ingredients(client):
+    import json
+
+    from app.db import session_scope
+    from app.schemas import RecipeIn
+    from app.services.importer import is_duplicate
+
+    a = {"title": "Chili", "ingredients": [{"text": "1 lb beef"}]}
+    b = {"title": "Chili", "ingredients": [{"text": "2 cans black beans"}]}
+    payload = json.dumps({"recipes": [a, b, a]})
+    r = client.post(
+        "/api/import/bundle",
+        files={"file": ("b.json", payload, "application/json")},
+        data={"skip_duplicates": "true"},
+    )
+    job = _wait_job(client, r.json()["id"])
+    assert job["imported"] == 2, job["log"]  # the third is an exact repeat of the first
+    with session_scope() as db:
+        assert is_duplicate(db, RecipeIn(**a))
+        assert not is_duplicate(db, RecipeIn(title="Chili", ingredients=[{"text": "tofu"}]))

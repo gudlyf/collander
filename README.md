@@ -19,7 +19,7 @@
 - **Tags, chosen by AI or by you.** The AI suggests tags and prefers tags you already use, so your vocabulary stays tidy. Rename or merge tags any time.
 - **Fast search.** Full-text search across titles, ingredients (original and modified), steps, notes and tags, ranked by relevance. See [search syntax](#search).
 - **Your choice of AI, or none.** Anthropic Claude, OpenAI (or any OpenAI-compatible server), Google Gemini, or a local model through Ollama. Everything except photo import works without AI.
-- **Kitchen-friendly.** Works on phones, can be installed as an app (PWA), keeps the screen awake while you cook, checks off ingredients and steps, and prints cleanly.
+- **Kitchen-friendly.** Works on phones, checks off ingredients and steps as you go, and prints cleanly. When served over HTTPS it can also be installed as an app (PWA), receive links shared from other apps, and keep the screen awake while you cook.
 - **One container, one volume.** SQLite and images live in a single data volume that is easy to back up. A one-click JSON backup is built in.
 
 <p align="center">
@@ -86,7 +86,7 @@ Model names change often; set the one you want on the Settings page. Use **Test 
 
 | Source | How |
 | --- | --- |
-| **Link** | Import → Link. Collander reads the page's schema.org recipe data when it exists, and otherwise has the AI read the page. Some sites block automated requests; copy the text and use **Paste text** instead. On Android, you can share a link from your browser straight to the installed app. |
+| **Link** | Import → Link. Collander reads the page's schema.org recipe data when it exists, and otherwise has the AI read the page. Some sites block automated requests; copy the text and use **Paste text** instead. When Collander is installed as an app over HTTPS on Android, you can share a link from your browser straight to it. |
 | **Photo** | Import → Photo. Take or choose one or more photos of a single recipe (pages in order). Each upload is queued. Results are saved with a **Needs review** badge, and the original photos are shown on the recipe page until you mark it reviewed. |
 | **Pasted text** | Import → Paste text. AI structures it; without AI, headings like "Ingredients" and "Directions" are used. |
 | **Evernote** | In Evernote, export notes or a notebook as `.enex`. Import → Evernote, upload the file, pick the notes that are recipes (likely recipes are pre-selected), and start. Notes that are just a photo are read from the photo when AI is on. Re-running skips recipes already imported. |

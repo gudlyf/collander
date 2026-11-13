@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..db import session_scope
 from ..models import ImportJob, Recipe
@@ -47,11 +47,32 @@ def to_data_uri(mime: str, data: bytes) -> str:
     return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
+def _fingerprint(lines) -> list[str]:
+    return [" ".join(x.text.lower().split()) for x in lines]
+
+
 def is_duplicate(db: Session, recipe: RecipeIn) -> bool:
-    q = select(Recipe.id).where(func.lower(Recipe.title) == recipe.title.strip().lower())
+    """True when an existing recipe has the same title, link and ingredients.
+
+    Matching on title alone would drop distinct recipes that happen to share a name
+    (two different "Chili" notes), so the ingredient list must match as well.
+    """
+    q = (
+        select(Recipe)
+        .where(func.lower(Recipe.title) == recipe.title.strip().lower())
+        .options(selectinload(Recipe.ingredients))
+    )
     if recipe.source_url:
         q = q.where(Recipe.source_url == recipe.source_url)
-    return db.scalar(q.limit(1)) is not None
+    else:
+        q = q.where(Recipe.source_url.is_(None))
+    want = _fingerprint(recipe.ingredients)
+    for existing in db.scalars(q):
+        if _fingerprint(existing.ingredients) != want:
+            continue
+        if want or (existing.original_text or "") == (recipe.original_text or ""):
+            return True
+    return False
 
 
 # ---- Evernote --------------------------------------------------------------

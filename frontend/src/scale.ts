@@ -9,8 +9,8 @@ const UNICODE_FRACTIONS: Record<string, number> = {
 };
 const UF = Object.keys(UNICODE_FRACTIONS).join("");
 
-// One number: "1 1/2", "1½", "1/2", "½", "1.5", "2", "1 ½"
-const NUM = `(?:\\d+(?:[.,]\\d+)?\\s*[${UF}]|\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:[.,]\\d+)?|[${UF}])`;
+// One number: "1 1/2", "1-1/2", "1½", "1/2", "½", "1.5", "2", "1 ½"
+const NUM = `(?:\\d+(?:[.,]\\d+)?\\s*[${UF}]|\\d+-\\d+/\\d+|\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:[.,]\\d+)?|[${UF}])`;
 // Optional range: "2-3", "2 – 3", "2 to 3", "2 or 3"
 const LEADING = new RegExp(`^(\\s*)(${NUM})(?:(\\s*(?:-|–|—|to|or)\\s*)(${NUM}))?`, "i");
 
@@ -18,7 +18,7 @@ export function parseNumber(s: string): number | null {
   s = s.trim().replace(",", ".");
   let m = s.match(new RegExp(`^(\\d+(?:\\.\\d+)?)\\s*([${UF}])$`));
   if (m) return parseFloat(m[1]) + UNICODE_FRACTIONS[m[2]];
-  m = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+  m = s.match(/^(\d+)(?:\s+|-)(\d+)\s*\/\s*(\d+)$/);
   if (m) return +m[1] + +m[2] / +m[3];
   m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (m) return +m[2] === 0 ? null : +m[1] / +m[2];
