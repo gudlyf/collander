@@ -102,7 +102,7 @@ def _apply(db: Session, r: Recipe, data: RecipeIn, *, replace_notes: bool) -> No
 
 
 def create_recipe(db: Session, data: RecipeIn) -> Recipe:
-    r = Recipe(title=data.title)
+    r = Recipe(title=data.title, import_key=data.import_key)
     if data.created_at:
         r.created_at = data.created_at
     db.add(r)

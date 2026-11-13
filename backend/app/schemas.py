@@ -59,6 +59,8 @@ class RecipeIn(BaseModel):
     # or a data: URI (used by bundles / Evernote). None removes the image.
     image: str | None = None
     created_at: datetime | None = None
+    # Set by importers only; not exposed in the editor.
+    import_key: str | None = Field(default=None, exclude=True)
 
 
 class IngredientOut(IngredientIn):

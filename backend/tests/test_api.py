@@ -164,3 +164,54 @@ def test_duplicate_detection_needs_matching_ingredients(client):
     with session_scope() as db:
         assert is_duplicate(db, RecipeIn(**a))
         assert not is_duplicate(db, RecipeIn(title="Chili", ingredients=[{"text": "tofu"}]))
+
+
+def test_reimport_with_ai_check_skips_everything(client, fake_ai):
+    """AI tidying changes the stored lines; re-runs must still recognise the source."""
+    import json
+
+    fake_ai.review = lambda user: {
+        "ingredients": [{"section": "", "text": "3 eggs, beaten"}],
+        "steps": [{"section": "", "text": "Whisk."}],
+        "issues": [],
+        "tags": [],
+    }
+    payload = json.dumps(
+        {
+            "recipes": [
+                {
+                    "title": "Rerun Omelette",
+                    "ingredients": [{"text": "▢ 3 eggs, beaten"}],
+                    "steps": [{"text": "1. Whisk."}],
+                }
+            ]
+        }
+    )
+    for expected in (1, 0):
+        r = client.post(
+            "/api/import/bundle",
+            files={"file": ("b.json", payload, "application/json")},
+            data={"skip_duplicates": "true", "ai_check": "true"},
+        )
+        job = _wait_job(client, r.json()["id"])
+        assert job["imported"] == expected, job["log"]
+    got = client.get("/api/recipes", params={"q": "Rerun Omelette"}).json()["items"]
+    rec = client.get(f"/api/recipes/{got[0]['id']}").json()
+    assert rec["ingredients"][0]["text"] == "3 eggs, beaten"  # tidied, yet still deduped
+
+
+def test_enex_rerun_with_ai_skips_before_calling_ai(client, fake_ai):
+    with open(FIXTURES / "sample.enex", "rb") as f:
+        preview = client.post(
+            "/api/import/enex", files={"file": ("s.enex", f, "application/xml")}
+        ).json()
+    job_id = preview["job"]["id"]
+    # Note 1 is new (photo-only); run it twice with AI on.
+    client.post(f"/api/import/enex/{job_id}/run", json={"indexes": [1], "use_ai": True})
+    first = _wait_job(client, job_id)
+    calls_after_first = len(fake_ai)
+    client.post(f"/api/import/enex/{job_id}/run", json={"indexes": [1], "use_ai": True})
+    second = _wait_job(client, job_id)
+    assert first["imported"] == 1, first["log"]
+    assert second["imported"] == 0, second["log"]
+    assert len(fake_ai) == calls_after_first  # no AI calls for the duplicate

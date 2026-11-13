@@ -115,6 +115,7 @@ async def upload_bundle(
         filename=file.filename or "bundle.json",
         stored_path=str(path),
         total=len(bundle.recipes),
+        use_ai=ai_check,
     )
     db.add(job)
     db.commit()

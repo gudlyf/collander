@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -49,6 +50,14 @@ def to_data_uri(mime: str, data: bytes) -> str:
 
 def _fingerprint(lines) -> list[str]:
     return [" ".join(x.text.lower().split()) for x in lines]
+
+
+def source_key(prefix: str, payload: str) -> str:
+    return f"{prefix}:{hashlib.sha256(payload.encode()).hexdigest()[:40]}"
+
+
+def key_exists(db: Session, key: str) -> bool:
+    return db.scalar(select(Recipe.id).where(Recipe.import_key == key).limit(1)) is not None
 
 
 def is_duplicate(db: Session, recipe: RecipeIn) -> bool:
@@ -174,8 +183,17 @@ def _run_enex(job_id: int, indexes: set[int], extra_tags: list[str]) -> None:
             if note.index not in indexes:
                 continue
             try:
+                key = source_key(
+                    "enex", f"{note.title}|{note.created}|{note.source_url}|{note.html}"
+                )
+                if key_exists(db, key):  # checked before any (slow, costly) AI call
+                    _log(job, f"skip  (duplicate) {note.title}")
+                    job.processed += 1
+                    db.commit()
+                    continue
                 recipe, method = note_to_recipe(note, cfg, existing, use_ai)
                 recipe.tags = list(dict.fromkeys([*recipe.tags, *extra_tags]))
+                recipe.import_key = key
                 if is_duplicate(db, recipe):
                     _log(job, f"skip  (duplicate) {note.title}")
                 else:
@@ -210,7 +228,9 @@ def _run_bundle(job_id: int, skip_duplicates: bool) -> None:
             try:
                 if recipe.source_kind == "manual":
                     recipe.source_kind = "bundle"
-                if skip_duplicates and is_duplicate(db, recipe):
+                # Fingerprint the raw entry *before* any AI tidying, so re-runs match.
+                key = source_key("bundle", recipe.model_dump_json(exclude={"import_key"}))
+                if skip_duplicates and (key_exists(db, key) or is_duplicate(db, recipe)):
                     _log(job, f"skip  (duplicate) {recipe.title}")
                 else:
                     detail = ""
@@ -222,6 +242,7 @@ def _run_bundle(job_id: int, skip_duplicates: bool) -> None:
                             existing = sorted(set(existing) | set(recipe.tags))
                         except ai.AIError as e:
                             detail = f" (AI check failed: {e})"
+                    recipe.import_key = key
                     create_recipe(db, recipe)
                     job.imported += 1
                     _log(job, f"ok    {recipe.title}{detail}")

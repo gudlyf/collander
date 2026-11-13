@@ -60,6 +60,9 @@ class Recipe(Base):
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
     # Free-form original text for imports that could not be fully structured.
     original_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Fingerprint of the raw import source (bundle entry, Evernote note), taken before any AI
+    # processing, so re-running an import skips what it already added.
+    import_key: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
