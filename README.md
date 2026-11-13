@@ -92,12 +92,22 @@ Model names change often; set the one you want on the Settings page. Use **Test 
 | **Evernote** | In Evernote, export notes or a notebook as `.enex`. Import → Evernote, upload the file, pick the notes that are recipes (likely recipes are pre-selected), and start. Notes that are just a photo are read from the photo when AI is on. Re-running skips recipes already imported. |
 | **Backup / bundle** | Import → Backup file. Accepts Collander backups and any file in the [bundle format](docs/bundle-format.md), which is handy for one-off migrations such as recipes collected from Google Docs. |
 
+### AI check
+
+An optional pass that runs your AI model over recipes to **tidy formatting and flag problems**. It is available as a checkbox on **Import → Backup file**, as an **AI check** button on each recipe, and under **Settings → Check recipes with AI** for every recipe that needs review, or all of them.
+
+- It removes leftover web or OCR clutter (checkbox glyphs, step numbers, link markup), splits or joins mangled lines, moves stray ingredients or steps to the right list, and suggests tags.
+- It never changes quantities, units or wording. If a suggested cleanup changes any number or drops text, it is rejected and the original kept. Lines carrying your modifications are never rewritten.
+- Problems it can't fix itself, such as an ingredient used in a step but missing from the list, are added as an "AI check" note and the recipe is marked **Needs review**.
+- When it does tidy lines, the before-version is saved under "Original imported text".
+
 Large files can also be imported from the command line inside the container:
 
 ```bash
 docker compose cp ./export.enex collander:/data/export.enex
 docker compose exec collander python -m app.cli import-enex /data/export.enex --ai --tag evernote
-docker compose exec collander python -m app.cli import-bundle /data/recipes.json
+docker compose exec collander python -m app.cli import-bundle /data/recipes.json --ai-check
+docker compose exec collander python -m app.cli ai-check            # recipes needing review
 ```
 
 ## Search
@@ -129,7 +139,7 @@ docker compose exec collander python -m app.cli export /data/backup.json
 docker compose exec collander python -m app.cli --help
 ```
 
-`import-bundle`, `import-enex`, `export`, `reindex` (rebuild search) and `set-password`.
+`import-bundle`, `import-enex`, `ai-check`, `export`, `reindex` (rebuild search) and `set-password`.
 
 ## Development
 

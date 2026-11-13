@@ -245,3 +245,63 @@ def _clean_tags(tags: list[str]) -> list[str]:
         if n and n not in out:
             out.append(n)
     return out[:10]
+
+
+# ---- Review / tidy ---------------------------------------------------------
+
+REVIEW_SCHEMA = _obj(
+    {
+        "ingredients": {"type": "array", "items": _LINE},
+        "steps": {"type": "array", "items": _LINE},
+        "issues": {"type": "array", "items": _STR},
+        "tags": {"type": "array", "items": _STR},
+    }
+)
+
+REVIEW_SYSTEM = f"""\
+You tidy and sanity-check a recipe that was imported from a web clip, document, photo or note.
+
+Return the ingredient and step lines, fixing ONLY formatting problems:
+- remove leftover clutter: checkbox glyphs, bullets, step numbers, link markup, "Jump to recipe",
+  ads, nutrition panels, image captions, stray headings
+- split lines that clearly hold two ingredients or two steps; join a line that was broken in half
+- move an ingredient that ended up in the steps (or a step in the ingredients) to the right list
+- keep group names in "section" ("" when there is none)
+
+Never change quantities, units, ingredient names or the author's wording. Never rescale, convert,
+substitute or "improve". Never drop content. Notes written in CAPITALS are the owner's own edits:
+keep them exactly. If a line is fine, return it unchanged. If nothing needs fixing, return the
+lines exactly as given.
+
+In "issues", list real problems a cook should know about that you must NOT fix yourself, e.g.
+an ingredient used in the steps but missing from the list, a missing step, an impossible
+amount, a garbled or cut-off line. Keep each issue to one short sentence. Use [] if none.
+
+{TAGGING_GUIDE}"""
+
+
+class _Review(BaseModel):
+    ingredients: list[_Line]
+    steps: list[_Line]
+    issues: list[str] = []
+    tags: list[str] = []
+
+
+def review_recipe(cfg: AIConfig, recipe: RecipeIn, existing_tags: list[str]) -> _Review:
+    def lines(items) -> str:
+        return "\n".join(f"- [{i.section}] {i.text}" if i.section else f"- {i.text}" for i in items)
+
+    body = [f"Title: {recipe.title}"]
+    if recipe.description:
+        body.append(f"Description: {recipe.description}")
+    if recipe.tags:
+        body.append(f"Current tags: {', '.join(recipe.tags)}")
+    body.append("Ingredients (group in brackets):\n" + (lines(recipe.ingredients) or "(none)"))
+    body.append("Steps (group in brackets):\n" + (lines(recipe.steps) or "(none)"))
+    if recipe.notes:
+        body.append("Notes:\n" + "\n".join(f"- {n.text}" for n in recipe.notes))
+    user = _vocab_text(existing_tags) + "\n\n<recipe>\n" + "\n\n".join(body) + "\n</recipe>"
+    result: _Review = _call(cfg, REVIEW_SYSTEM, user, REVIEW_SCHEMA, "review", _Review)
+    result.tags = _clean_tags(result.tags)
+    result.issues = [i.strip() for i in result.issues if i.strip()][:8]
+    return result

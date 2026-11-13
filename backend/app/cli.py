@@ -52,6 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("import-bundle", help="Import a Collander JSON bundle")
     b.add_argument("path", type=Path)
     b.add_argument("--allow-duplicates", action="store_true")
+    b.add_argument("--ai-check", action="store_true", help="Tidy/sanity-check each recipe with AI")
+
+    c = sub.add_parser("ai-check", help="Tidy/sanity-check existing recipes with AI")
+    c.add_argument("--all", action="store_true", help="All recipes (default: needs-review only)")
 
     e = sub.add_parser("import-enex", help="Import an Evernote .enex export")
     e.add_argument("path", type=Path)
@@ -73,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         from .services import importer
 
         job_id = _new_job("bundle", args.path)
+        with session_scope() as db:
+            from .models import ImportJob
+
+            db.get(ImportJob, job_id).use_ai = args.ai_check
         importer.run_bundle_sync(job_id, skip_duplicates=not args.allow_duplicates)
         _report(job_id)
     elif args.cmd == "import-enex":
@@ -108,6 +116,24 @@ def main(argv: list[str] | None = None) -> int:
             bundle = Bundle(recipes=[to_in(r, embed_image=not args.no_images) for r in rows])
         args.path.write_text(json.dumps(bundle.model_dump(mode="json"), indent=1))
         print(f"Wrote {len(bundle.recipes)} recipes to {args.path}")
+    elif args.cmd == "ai-check":
+        from sqlalchemy import select
+
+        from .models import ImportJob, Recipe
+        from .services import importer
+
+        with session_scope() as db:
+            q = select(Recipe.id).order_by(Recipe.id)
+            if not args.all:
+                q = q.where(Recipe.needs_review.is_(True))
+            ids = list(db.scalars(q))
+            job = ImportJob(kind="ai-check", status="running", filename="cli", stored_path="")
+            db.add(job)
+            db.flush()
+            job_id = job.id
+        print(f"Checking {len(ids)} recipes")
+        importer.run_ai_check_sync(job_id, ids)
+        _report(job_id)
     elif args.cmd == "reindex":
         from .services import search
 

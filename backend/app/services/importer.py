@@ -195,12 +195,17 @@ def _run_enex(job_id: int, indexes: set[int], extra_tags: list[str]) -> None:
 
 
 def _run_bundle(job_id: int, skip_duplicates: bool) -> None:
+    from .ai_check import check_recipe
+
     with session_scope() as db:
         job = db.get(ImportJob, job_id)
         job.status = "running"
         db.commit()
         bundle = load_bundle(Path(job.stored_path))
         job.total = len(bundle.recipes)
+        cfg = load_ai_config(db)
+        use_ai = job.use_ai and cfg.enabled
+        existing = all_tag_names(db)
         for recipe in bundle.recipes:
             try:
                 if recipe.source_kind == "manual":
@@ -208,9 +213,18 @@ def _run_bundle(job_id: int, skip_duplicates: bool) -> None:
                 if skip_duplicates and is_duplicate(db, recipe):
                     _log(job, f"skip  (duplicate) {recipe.title}")
                 else:
+                    detail = ""
+                    if use_ai:
+                        try:
+                            res = check_recipe(cfg, recipe, existing)
+                            recipe = res.recipe
+                            detail = _check_detail(res)
+                            existing = sorted(set(existing) | set(recipe.tags))
+                        except ai.AIError as e:
+                            detail = f" (AI check failed: {e})"
                     create_recipe(db, recipe)
                     job.imported += 1
-                    _log(job, f"ok    {recipe.title}")
+                    _log(job, f"ok    {recipe.title}{detail}")
             except Exception as e:  # noqa: BLE001
                 db.rollback()
                 job = db.get(ImportJob, job_id)
@@ -219,6 +233,83 @@ def _run_bundle(job_id: int, skip_duplicates: bool) -> None:
             job.processed += 1
             db.commit()
         job.status = "done"
+
+
+def _check_detail(res) -> str:
+    bits = []
+    if res.changed_lines:
+        bits.append("tidied")
+    if res.issues:
+        bits.append(f"{len(res.issues)} issue(s)")
+    if res.added_tags:
+        bits.append("tags +" + ",".join(res.added_tags))
+    return f" [{'; '.join(bits)}]" if bits else ""
+
+
+def _run_ai_check(job_id: int, recipe_ids: list[int]) -> None:
+    """Re-check existing recipes with the configured AI (background job)."""
+    from sqlalchemy.orm import selectinload
+
+    from .ai_check import check_recipe
+    from .recipes import to_in
+
+    with session_scope() as db:
+        job = db.get(ImportJob, job_id)
+        job.status, job.total = "running", len(recipe_ids)
+        db.commit()
+        cfg = load_ai_config(db)
+        existing = all_tag_names(db)
+        for rid in recipe_ids:
+            r = db.scalar(
+                select(Recipe)
+                .where(Recipe.id == rid)
+                .options(
+                    selectinload(Recipe.ingredients),
+                    selectinload(Recipe.steps),
+                    selectinload(Recipe.notes),
+                    selectinload(Recipe.tags),
+                )
+            )
+            if r is None:
+                job.processed += 1
+                continue
+            try:
+                res = check_recipe(cfg, to_in(r), existing)
+                apply_check(db, r, res)
+                job.imported += 1
+                _log(job, f"ok    {r.title}{_check_detail(res)}")
+            except Exception as e:  # noqa: BLE001
+                db.rollback()
+                job = db.get(ImportJob, job_id)
+                job.failed += 1
+                _log(job, f"FAIL  {r.title}: {e}")
+            job.processed += 1
+            db.commit()
+        job.status = "done"
+
+
+def apply_check(db: Session, r: Recipe, res) -> None:
+    """Write a CheckResult back to an existing recipe (notes are synced separately)."""
+    from ..models import Note
+    from . import search
+    from .ai_check import NOTE_PREFIX
+    from .recipes import update_recipe
+
+    res.recipe.image = r.image  # the checked copy carries no image; keep the stored one
+    update_recipe(db, r, res.recipe)  # replaces lines/tags/flags, keeps notes
+    for n in list(r.notes):
+        if n.text.startswith(NOTE_PREFIX):
+            db.delete(n)
+    for n in res.recipe.notes:
+        if n.text.startswith(NOTE_PREFIX):
+            db.add(Note(recipe_id=r.id, text=n.text))
+    db.flush()
+    db.refresh(r)
+    search.index_recipe(db, r)
+
+
+def start_ai_check_job(job_id: int, recipe_ids: list[int]) -> None:
+    threading.Thread(target=_guard, args=(_run_ai_check, job_id, recipe_ids), daemon=True).start()
 
 
 def load_bundle(path: Path) -> Bundle:
@@ -260,6 +351,10 @@ def run_bundle_sync(job_id: int, skip_duplicates: bool) -> None:
 def run_enex_sync(job_id: int, indexes: list[int], extra_tags: list[str]) -> None:
     tags = [t for t in (normalize_tag(x) for x in extra_tags) if t]
     _guard(_run_enex, job_id, set(indexes), tags)
+
+
+def run_ai_check_sync(job_id: int, recipe_ids: list[int]) -> None:
+    _guard(_run_ai_check, job_id, recipe_ids)
 
 
 def mark_interrupted_jobs() -> None:

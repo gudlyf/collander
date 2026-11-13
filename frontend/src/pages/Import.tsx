@@ -335,7 +335,7 @@ function TextTab({ aiOn }: { aiOn: boolean }) {
   );
 }
 
-function JobProgress({ jobId, onDone }: { jobId: number; onDone?: () => void }) {
+export function JobProgress({ jobId, onDone }: { jobId: number; onDone?: () => void }) {
   const [job, setJob] = useState<ImportJob | null>(null);
   useEffect(() => {
     let stop = false;
@@ -357,10 +357,21 @@ function JobProgress({ jobId, onDone }: { jobId: number; onDone?: () => void }) 
     <div className="stack" style={{ gap: 8 }}>
       <div className="spread">
         <strong>
-          {job.status === "running" ? "Importing…" : job.status === "done" ? "Import finished" : `Import ${job.status}`}
+          {job.kind === "ai-check"
+            ? job.status === "running"
+              ? "Checking…"
+              : job.status === "done"
+                ? "Check finished"
+                : `Check ${job.status}`
+            : job.status === "running"
+              ? "Importing…"
+              : job.status === "done"
+                ? "Import finished"
+                : `Import ${job.status}`}
         </strong>
         <span className="small muted">
-          {job.processed}/{job.total} processed · {job.imported} added · {job.failed} failed
+          {job.processed}/{job.total} processed · {job.imported} {job.kind === "ai-check" ? "checked" : "added"} ·{" "}
+          {job.failed} failed
         </span>
       </div>
       <div className="progress">
@@ -509,8 +520,9 @@ function EvernoteTab({ aiOn }: { aiOn: boolean }) {
   );
 }
 
-function BundleTab() {
+function BundleTab({ aiOn }: { aiOn: boolean }) {
   const [skip, setSkip] = useState(true);
+  const [aiCheck, setAiCheck] = useState(false);
   const [jobId, setJobId] = useState<number | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -524,8 +536,18 @@ function BundleTab() {
       </p>
       <label className="check">
         <input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} />
-        Skip recipes I already have (same title and link)
+        Skip recipes I already have (same title, link and ingredients)
       </label>
+      <label className="check">
+        <input type="checkbox" checked={aiCheck} disabled={!aiOn} onChange={(e) => setAiCheck(e.target.checked)} />
+        Tidy and check each recipe with AI{aiOn ? "" : " (set up AI in Settings first)"}
+      </label>
+      {aiCheck && (
+        <p className="small muted" style={{ margin: 0 }}>
+          The AI cleans up formatting and suggests tags, but never changes quantities or wording. Problems it
+          finds are added as a note and the recipe is marked Needs review. This takes a while for large files.
+        </p>
+      )}
       <label className="field">
         Collander bundle (.json)
         <input
@@ -538,6 +560,7 @@ function BundleTab() {
             const form = new FormData();
             form.append("file", f);
             form.append("skip_duplicates", String(skip));
+            form.append("ai_check", String(aiCheck));
             try {
               setProgress(0);
               const job = await upload<ImportJob>("/import/bundle", form, setProgress);
@@ -592,7 +615,7 @@ export default function Import({ queueItems }: { queueItems: QueueItem[] }) {
             {tab === "photo" && <PhotoTab aiOn={aiOn} />}
             {tab === "text" && <TextTab aiOn={aiOn} />}
             {tab === "evernote" && <EvernoteTab aiOn={aiOn} />}
-            {tab === "bundle" && <BundleTab />}
+            {tab === "bundle" && <BundleTab aiOn={aiOn} />}
           </>
         )}
       </div>

@@ -10,6 +10,7 @@ First release.
 - Full-text search (SQLite FTS5) with phrases, exclusions, tag and status filters.
 - Import from links (schema.org, then AI), photos (vision AI), pasted text, Evernote `.enex`, and JSON bundles.
 - Background import queue for links, photos and text.
+- Optional AI check: tidies formatting and flags problems without changing quantities or wording.
 - AI providers: Anthropic, OpenAI and compatible servers, Google Gemini, Ollama.
 - Single-password sign-in, JSON backup and restore, CLI tools.
 - Docker image and Compose file.

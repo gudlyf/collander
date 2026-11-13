@@ -3,15 +3,17 @@ from __future__ import annotations
 import shutil
 import uuid
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import require_auth
 from ..config import get_settings
 from ..db import get_db
-from ..models import ImportJob
+from ..models import ImportJob, Recipe
 from ..schemas import EnexNotePreview, EnexPreview, EnexRunRequest, ImportJobOut
 from ..services import importer
 from ..services.settings_store import load_ai_config
@@ -95,9 +97,12 @@ def run_enex(job_id: int, body: EnexRunRequest, db: Session = Depends(get_db)):
 async def upload_bundle(
     file: UploadFile = File(...),
     skip_duplicates: bool = Form(True),
+    ai_check: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """Import a Collander JSON bundle (backup, Google Drive import, etc.)."""
+    if ai_check and not load_ai_config(db).enabled:
+        raise HTTPException(409, "AI is not configured.")
     path = await _store_upload(file, ".json")
     try:
         bundle = importer.load_bundle(path)
@@ -117,6 +122,37 @@ async def upload_bundle(
     return job
 
 
+class AICheckRequest(BaseModel):
+    scope: Literal["review", "all"] = "review"
+
+
+@router.post("/ai-check", response_model=ImportJobOut)
+def start_ai_check(body: AICheckRequest, db: Session = Depends(get_db)):
+    """Tidy and sanity-check existing recipes with the configured AI, in the background."""
+    if not load_ai_config(db).enabled:
+        raise HTTPException(409, "AI is not configured.")
+    if db.scalar(
+        select(ImportJob.id).where(ImportJob.kind == "ai-check", ImportJob.status == "running")
+    ):
+        raise HTTPException(409, "A check is already running.")
+    q = select(Recipe.id).order_by(Recipe.id)
+    if body.scope == "review":
+        q = q.where(Recipe.needs_review.is_(True))
+    ids = list(db.scalars(q))
+    job = ImportJob(
+        kind="ai-check",
+        status="running",
+        filename=f"{body.scope} recipes",
+        stored_path="",
+        total=len(ids),
+        use_ai=True,
+    )
+    db.add(job)
+    db.commit()
+    importer.start_ai_check_job(job.id, ids)
+    return job
+
+
 @router.delete("/jobs/{job_id}", status_code=204)
 def delete_job(job_id: int, db: Session = Depends(get_db)):
     job = db.get(ImportJob, job_id)
@@ -124,7 +160,8 @@ def delete_job(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Job not found")
     if job.status == "running":
         raise HTTPException(409, "Job is running.")
-    Path(job.stored_path).unlink(missing_ok=True)
+    if job.stored_path:
+        Path(job.stored_path).unlink(missing_ok=True)
     db.delete(job)
     db.commit()
 

@@ -25,34 +25,47 @@ def client():
         yield c
 
 
+class FakeAI(list):
+    """Records provider calls; set .review to customize the review/tidy response."""
+
+    def __init__(self):
+        super().__init__()
+        self.review = lambda user: {
+            "ingredients": [{"section": "", "text": "2 cups broth"}],
+            "steps": [{"section": "", "text": "Heat it."}],
+            "issues": [],
+            "tags": ["soup"],
+        }
+
+    def complete_json(self, system, user, schema, name, images=None):
+        self.append({"system": system, "user": user, "name": name, "images": images})
+        if name == "tags":
+            return {"tags": ["Soup", "vegetarian", "soup"]}
+        if name == "review":
+            return self.review(user)
+        return {
+            "is_recipe": True,
+            "title": "Fake Soup",
+            "description": "",
+            "servings": "4",
+            "prep_time": "",
+            "cook_time": "",
+            "total_time": "",
+            "ingredients": [{"section": "", "text": "2 cups broth"}],
+            "steps": [{"section": "", "text": "Heat it."}],
+            "notes": ["Freezes well."],
+            "tags": ["Soup", "Weeknight Dinner"],
+        }
+
+
 @pytest.fixture
 def fake_ai(monkeypatch):
-    """Replace the provider layer with a canned responder."""
+    """Replace the provider layer with a canned responder and pretend AI is enabled."""
     from app.services import settings_store
     from app.services.ai import tasks
 
-    calls = []
-
-    class Fake:
-        def complete_json(self, system, user, schema, name, images=None):
-            calls.append({"system": system, "user": user, "name": name, "images": images})
-            if name == "tags":
-                return {"tags": ["Soup", "vegetarian", "soup"]}
-            return {
-                "is_recipe": True,
-                "title": "Fake Soup",
-                "description": "",
-                "servings": "4",
-                "prep_time": "",
-                "cook_time": "",
-                "total_time": "",
-                "ingredients": [{"section": "", "text": "2 cups broth"}],
-                "steps": [{"section": "", "text": "Heat it."}],
-                "notes": ["Freezes well."],
-                "tags": ["Soup", "Weeknight Dinner"],
-            }
-
-    monkeypatch.setattr(tasks, "get_provider", lambda cfg: Fake())
+    fake = FakeAI()
+    monkeypatch.setattr(tasks, "get_provider", lambda cfg: fake)
     real = settings_store.load_ai_config
 
     def enabled_cfg(db):
@@ -64,7 +77,9 @@ def fake_ai(monkeypatch):
         "app.services.settings_store",
         "app.services.queue",
         "app.routers.queue",
+        "app.routers.imports",
+        "app.routers.recipes",
         "app.services.importer",
     ):
         monkeypatch.setattr(f"{mod}.load_ai_config", enabled_cfg, raising=False)
-    return calls
+    return fake

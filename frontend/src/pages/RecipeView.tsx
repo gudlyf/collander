@@ -177,6 +177,49 @@ function ReviewBanner({ recipe, onReviewed }: { recipe: Recipe; onReviewed: () =
   );
 }
 
+interface CheckResult {
+  recipe: Recipe;
+  issues: string[];
+  changed_lines: boolean;
+  added_tags: string[];
+}
+
+function AICheckButton({ recipe, onDone }: { recipe: Recipe; onDone: (r: Recipe) => void }) {
+  const ai = useApi<{ provider: string }>("/settings/ai");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: string; text: string } | null>(null);
+  if (!ai.data || ai.data.provider === "none") return null;
+  const run = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await api.post<CheckResult>(`/recipes/${recipe.id}/ai-check`);
+      onDone(res.recipe);
+      const bits = [];
+      if (res.changed_lines) bits.push("tidied the formatting (the original is saved below)");
+      if (res.added_tags.length) bits.push(`added tags: ${res.added_tags.join(", ")}`);
+      if (res.issues.length) bits.push(`found ${res.issues.length} thing(s) to check (see Notes)`);
+      setMsg({ kind: "", text: bits.length ? `AI check ${bits.join("; ")}.` : "AI check found nothing to fix." });
+    } catch (e) {
+      setMsg({ kind: "error", text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button className="btn" onClick={run} disabled={busy} title="Tidy formatting and flag problems">
+        {busy ? "Checking…" : "AI check"}
+      </button>
+      {msg && (
+        <div className={`alert small ${msg.kind}`} style={{ flexBasis: "100%" }}>
+          {msg.text}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function RecipeView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -280,6 +323,7 @@ export default function RecipeView() {
             <Link to={`/r/${recipe.id}/edit`} className="btn">
               <PencilIcon /> Edit
             </Link>
+            <AICheckButton recipe={recipe} onDone={setData} />
             <button className="btn icon" onClick={() => window.print()} aria-label="Print" title="Print">
               <PrinterIcon />
             </button>

@@ -2,6 +2,50 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type AISettings, type AuthStatus } from "../api";
 import { useApi } from "../hooks";
+import { JobProgress } from "./Import";
+
+function CheckRecipes() {
+  const ai = useApi<AISettings>("/settings/ai");
+  const [scope, setScope] = useState<"review" | "all">("review");
+  const [jobId, setJobId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!ai.data || ai.data.provider === "none") return null;
+  return (
+    <div className="panel stack">
+      <h2>Check recipes with AI</h2>
+      <p className="muted small">
+        Tidies leftover formatting from imports, suggests tags, and flags problems such as an ingredient used in a
+        step but missing from the list. Quantities and wording are never changed; anything it finds is added as a
+        note and the recipe is marked Needs review. Runs in the background.
+      </p>
+      {jobId ? (
+        <JobProgress jobId={jobId} />
+      ) : (
+        <div className="row">
+          <select value={scope} onChange={(e) => setScope(e.target.value as "review" | "all")} style={{ width: "auto" }}>
+            <option value="review">Recipes that need review</option>
+            <option value="all">All recipes</option>
+          </select>
+          <button
+            className="btn"
+            onClick={async () => {
+              setError(null);
+              try {
+                const job = await api.post<{ id: number }>("/import/ai-check", { scope });
+                setJobId(job.id);
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+          >
+            Start check
+          </button>
+        </div>
+      )}
+      {error && <div className="alert error">{error}</div>}
+    </div>
+  );
+}
 
 const PROVIDERS: [string, string][] = [
   ["none", "Off"],
@@ -208,6 +252,7 @@ export default function Settings({ auth }: { auth: AuthStatus }) {
     <div className="stack" style={{ maxWidth: 720, gap: 24 }}>
       <h1>Settings</h1>
       <AIForm />
+      <CheckRecipes />
       <div className="panel stack">
         <h2>Backup</h2>
         <p className="muted small">

@@ -265,3 +265,32 @@ def suggest_tags_for_draft(body: RecipeIn, db: Session = Depends(get_db)):
         return ai.suggest_tags(cfg, body, all_tag_names(db))
     except ai.AIError as e:
         raise HTTPException(502, str(e)) from e
+
+
+class AICheckOut(BaseModel):
+    recipe: RecipeOut
+    issues: list[str]
+    changed_lines: bool
+    added_tags: list[str]
+
+
+@router.post("/{recipe_id}/ai-check", response_model=AICheckOut)
+def ai_check_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    """Tidy formatting and flag problems with the configured AI. Never changes quantities."""
+    from ..services.ai_check import check_recipe
+    from ..services.importer import apply_check
+
+    cfg = load_ai_config(db)
+    r = _get(db, recipe_id)
+    try:
+        res = check_recipe(cfg, to_in(r), all_tag_names(db))
+    except ai.AIError as e:
+        raise HTTPException(502, str(e)) from e
+    apply_check(db, r, res)
+    db.commit()
+    return AICheckOut(
+        recipe=to_out(_get(db, recipe_id)),
+        issues=res.issues,
+        changed_lines=res.changed_lines,
+        added_tags=res.added_tags,
+    )
