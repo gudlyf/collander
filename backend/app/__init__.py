@@ -3,7 +3,7 @@ import subprocess
 from functools import cache
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 
 @cache

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 (2026-11-14)
 
 - The keep-screen-on button is labelled, remembered on each device, and turns itself back on when you return to the app. Over plain HTTP it explains that browsers need HTTPS for it.
 
