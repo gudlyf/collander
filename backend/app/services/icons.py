@@ -344,15 +344,50 @@ A1111_SIZE = 768
 
 
 def a1111_prompt(subject: str) -> str:
+    # Don't list the app's palette here: the model paints the food in those colours and it
+    # stops looking like food. The cobalt field alone ties the icons to the app.
     return (
-        f"Flat minimalist vector illustration of {subject}, centered, drawn with a few bold "
-        "simple geometric shapes with rounded corners, filling about the middle half of the "
-        f"picture. One uniform solid cobalt blue {BACKGROUND.lower()} field fills the entire "
-        "background edge to edge. Colors: off-white #f6f7f4, deep navy #14213d, light blue "
-        "#9cc0ff, and natural food colors. Clean modern flat design, no shading, no gradients, "
-        "no texture. Completely textless image without any title, caption, words, letters, "
-        "numbers or labels."
+        f"A flat vector illustration of {subject}, in their real natural food colors, large "
+        "and centered. Simple clean flat design, bold smooth shapes, minimal detail, no "
+        "shading, no gradients. The background is plain solid cobalt blue, edge to edge. "
+        "Completely textless image: no words, letters, numbers or labels."
     )
+
+
+LOOK_SCHEMA = {
+    "type": "object",
+    "properties": {"look": {"type": "string"}},
+    "required": ["look"],
+    "additionalProperties": False,
+}
+
+
+def dish_look(ai_cfg: AIConfig, r: Recipe) -> str | None:
+    """Ask the AI model what the dish looks like, in plain words an image model can draw.
+
+    Image models draw a dish's name loosely ("ginger cookies" became gingerbread men); a
+    description of its shape and colours comes out recognisable. None if there's no model
+    or it fails, and the caller falls back to ``food_subject``.
+    """
+    if not ai_cfg.enabled:
+        return None
+    try:
+        res = get_provider(ai_cfg).complete_json(
+            "You describe how dishes look, for an illustrator. Reply with JSON only.",
+            "Describe what this dish looks like when served, as one simple picture, in at most "
+            "20 plain lowercase words: the food itself, its shape and its colours, and how it "
+            "sits (on a plate, in a bowl, stacked). Name the food plainly. No title, quotes, "
+            "brand names or garnish lists.\n\n" + describe(r),
+            LOOK_SCHEMA,
+            "dish_look",
+        )
+    except Exception as e:  # noqa: BLE001 - fall back to the plain subject
+        log.info("Dish description skipped: %s", e)
+        return None
+    # Lowercase and unquoted, like food_subject: capitalised or quoted words get painted.
+    look = re.sub(r"[\"'‘’“”]", "", str(res.get("look") or "")).lower()
+    look = " ".join(look.split()).strip(" .")
+    return " ".join(look.split()[:30]) or None
 
 
 def _a1111_url(img_cfg: ImageConfig) -> str:
@@ -429,17 +464,18 @@ def check_ready(ai_cfg: AIConfig, img_cfg: ImageConfig) -> str | None:
 
 QA_SCHEMA = {
     "type": "object",
-    "properties": {"has_text": {"type": "boolean"}},
-    "required": ["has_text"],
+    "properties": {"has_text": {"type": "boolean"}, "shows_dish": {"type": "boolean"}},
+    "required": ["has_text", "shows_dish"],
     "additionalProperties": False,
 }
 PAINT_ATTEMPTS = 3
 
 
-def has_stray_text(ai_cfg: AIConfig, png: bytes) -> bool | None:
-    """Ask the AI model (if it can see images) whether a painted icon contains text.
+def check_icon(ai_cfg: AIConfig, png: bytes, dish: str) -> dict | None:
+    """Ask the AI model (if it can see images) whether a painted icon is usable.
 
-    Returns None when there is no model to ask or it can't look at images.
+    Returns {"has_text": bool, "shows_dish": bool}, or None when there is no model to ask
+    or it can't look at images.
     """
     if not ai_cfg.enabled:
         return None
@@ -450,15 +486,22 @@ def has_stray_text(ai_cfg: AIConfig, png: bytes) -> bool | None:
         img.save(buf, "PNG")
         res = get_provider(ai_cfg).complete_json(
             "You check small food illustrations for a recipe app. Reply with JSON only.",
-            "Does this picture contain any visible text: letters, words, numbers, a title, "
-            "a caption or a logo? Food shapes and decorations are not text.",
+            f"This icon should show: {dish}.\n"
+            "has_text: does the picture contain any visible text: letters, words, numbers, "
+            "a title, a caption or a logo? Food shapes and decorations are not text.\n"
+            "shows_dish: would someone looking at it recognise that food (or something very "
+            "like it)? A simplified, flat drawing is fine; abstract shapes that could be "
+            "anything are not.",
             QA_SCHEMA,
             "icon_qa",
             images=[("image/png", buf.getvalue())],
         )
-        return bool(res.get("has_text"))
+        return {
+            "has_text": bool(res.get("has_text")),
+            "shows_dish": bool(res.get("shows_dish", True)),
+        }
     except Exception as e:  # noqa: BLE001 - a model without vision just skips the check
-        log.info("Icon text check skipped: %s", e)
+        log.info("Icon check skipped: %s", e)
         return None
 
 
@@ -477,16 +520,23 @@ def make_icon_png(ai_cfg: AIConfig, img_cfg: ImageConfig, r: Recipe) -> bytes:
         raise AIError(problem)
     if img_cfg.provider == "svg":
         return _draw_svg(ai_cfg, img_cfg, describe(r))
-    subject = food_subject(r)
-    # Image models sometimes paint words anyway; if the AI model can look, repaint (each
-    # try uses a new seed) and keep the last attempt if text keeps appearing.
-    png = b""
+    subject = dish_look(ai_cfg, r) or food_subject(r)
+    dish = r.title.strip() or food_subject(r)
+    # Image models sometimes paint words, or abstract shapes that aren't the dish. If the AI
+    # model can look, repaint (each try uses a new seed) and keep the best attempt.
+    best, best_score = b"", -1
     for _ in range(PAINT_ATTEMPTS):
         png = _paint(ai_cfg, img_cfg, subject)
-        if not has_stray_text(ai_cfg, png):
+        verdict = check_icon(ai_cfg, png, dish)
+        if verdict is None:
+            return png
+        score = (not verdict["has_text"]) + verdict["shows_dish"]
+        if score > best_score:
+            best, best_score = png, score
+        if score == 2:
             break
-        log.info("Icon for %r had text in it; painting it again", r.title)
-    return png
+        log.info("Icon for %r was not usable (%s); painting it again", r.title, verdict)
+    return best
 
 
 def _store(png: bytes) -> str:

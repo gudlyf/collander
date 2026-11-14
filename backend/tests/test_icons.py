@@ -257,7 +257,7 @@ def test_bulk_job_stops_after_repeated_failures(client, monkeypatch):
     client.put("/api/settings/images", json={"provider": "none"})
 
 
-def test_painted_icon_with_text_is_repainted(client, fake_ai, monkeypatch):
+def test_a1111_paints_the_dish_as_the_ai_model_describes_it(client, fake_ai, monkeypatch):
     import httpx
 
     from app.services import icons
@@ -273,20 +273,69 @@ def test_painted_icon_with_text_is_repainted(client, fake_ai, monkeypatch):
             posts.append(json) or httpx.Response(200, json={"images": [png_b64]})
         ),
     )
-    verdicts = iter([True, False])  # first painting has text, second is clean
+    client.put("/api/settings/images", json={"provider": "a1111", "base_url": "http://sd.test"})
+    rid = client.post(
+        "/api/recipes", json={"title": "Grandma's Soup", "ingredients": [{"text": "2 carrots"}]}
+    ).json()["id"]
+    assert client.post(f"/api/recipes/{rid}/icon").status_code == 200
+    look = [c for c in fake_ai if c["name"] == "dish_look"]
+    assert len(look) == 1 and "Grandma's Soup" in look[0]["user"]
+    prompt = posts[-1]["prompt"]
+    # The description, lowercased and unquoted, replaces the recipe name.
+    assert "illustration of a steaming bowl of golden soup, in their" in prompt
+    assert '"' not in prompt and "grandma" not in prompt.lower()
+    client.put("/api/settings/images", json={"provider": "none"})
+
+
+@pytest.mark.parametrize(
+    "verdicts, paints, kept",
+    [
+        # text in the first painting, clean second: stop after two
+        ([(True, True), (False, True)], 2, 1),
+        # abstract shapes first, then the dish
+        ([(False, False), (False, True)], 2, 1),
+        # never fully right: keep the best of three, not the last
+        ([(True, False), (False, False), (True, True)], 3, 1),
+    ],
+)
+def test_unusable_painted_icon_is_repainted(client, fake_ai, monkeypatch, verdicts, paints, kept):
+    import httpx
+
+    from app.services import icons
+
+    colours = [(200, 0, 0), (0, 200, 0), (0, 0, 200)]
+
+    def painting(n):
+        buf = io.BytesIO()
+        Image.new("RGB", (768, 768), colours[n]).save(buf, "PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+
+    posts = []
+
+    def post(url, json, timeout):
+        posts.append(json)
+        return httpx.Response(200, json={"images": [painting(len(posts) - 1)]})
+
+    monkeypatch.setattr(icons.httpx, "post", post)
+    answers = iter(verdicts)
     real = fake_ai.complete_json
 
     def complete_json(system, user, schema, name, images=None):
         if name == "icon_qa":
-            fake_ai.append({"name": name, "images": images})
-            return {"has_text": next(verdicts)}
+            fake_ai.append({"name": name, "user": user, "images": images})
+            has_text, shows_dish = next(answers)
+            return {"has_text": has_text, "shows_dish": shows_dish}
         return real(system, user, schema, name, images)
 
     monkeypatch.setattr(fake_ai, "complete_json", complete_json)
     client.put("/api/settings/images", json={"provider": "a1111", "base_url": "http://sd.test"})
     rid = client.post("/api/recipes", json={"title": "Wordy Waffles"}).json()["id"]
-    assert client.post(f"/api/recipes/{rid}/icon").json()["image_generated"] is True
-    assert len(posts) == 2
+    made = client.post(f"/api/recipes/{rid}/icon").json()
+    assert made["image_generated"] is True
+    assert len(posts) == paints
     qa = [c for c in fake_ai if c["name"] == "icon_qa"]
-    assert len(qa) == 2 and qa[0]["images"][0][0] == "image/png"
+    assert len(qa) == paints and qa[0]["images"][0][0] == "image/png"
+    assert "Wordy Waffles" in qa[0]["user"]
+    stored = Image.open(io.BytesIO(client.get(f"/api/images/{made['image']}").content))
+    assert stored.convert("RGB").getpixel((5, 5)) == colours[kept]
     client.put("/api/settings/images", json={"provider": "none"})

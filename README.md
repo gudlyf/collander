@@ -129,7 +129,7 @@ Recipes without a photo can get a simple icon in the style of the Collander logo
 | OpenAI (`openai`) | `gpt-image-2` | Uses the OpenAI API key. |
 | Google (`google`) | `gemini-2.5-flash-image` | Uses the Google API key. Gemini image models are called through `generate_content`, `imagen-*` models through `generate_images`. Model names change often; set a current one if the default is retired. |
 
-Painted icons (every engine except `svg`) are checked for stray text by your AI model when it can read images, and repainted with a new seed up to twice if any shows up.
+For painted icons (every engine except `svg`), your AI model first describes how the dish looks, since image models draw a dish's name loosely. If the model can read images, it then checks each icon for stray text and for whether it shows the dish, and repaints with a new seed up to twice, keeping the best attempt. Without an AI model, icons are painted from the recipe name and first ingredients and aren't checked.
 
 New recipes added by hand or through the import queue get an icon automatically (you can turn that off). Bulk imports don't; use **Make icons** in Settings to fill in every recipe without a photo, or **Make icon** / **New icon** on a recipe. A photo always replaces the icon, and icons are included in backups.
 

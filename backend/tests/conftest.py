@@ -43,6 +43,8 @@ class FakeAI(list):
             return {"tags": ["Soup", "vegetarian", "soup"]}
         if name == "review":
             return self.review(user)
+        if name == "dish_look":
+            return {"look": 'A steaming "Bowl" of golden soup.'}
         if name == "icon":
             return {
                 "subject": "a bowl of soup",
