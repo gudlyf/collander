@@ -175,25 +175,14 @@ export function LineList({ lines, kind, factor, onChange }: ListProps) {
                   l.is_addition ? "added" : ""
                 }`}
               >
-                {isStep ? (
-                  <button
-                    className="num btn ghost"
-                    style={{ padding: 0, border: 0, justifyContent: "flex-start" }}
-                    onClick={() => toggleDone(i)}
-                    aria-label={`Mark step ${stepNo} ${done.has(i) ? "not done" : "done"}`}
-                    aria-pressed={done.has(i)}
-                  >
-                    {l.omitted ? "–" : stepNo}
-                  </button>
-                ) : (
-                  <input
-                    type="checkbox"
-                    className="tick check"
-                    checked={done.has(i)}
-                    onChange={() => toggleDone(i)}
-                    aria-label={`Got ${l.text}`}
-                  />
-                )}
+                <input
+                  type="checkbox"
+                  className="tick check"
+                  checked={done.has(i)}
+                  onChange={() => toggleDone(i)}
+                  aria-label={isStep ? `Done with step ${l.omitted ? "" : stepNo}`.trim() : `Got ${l.text}`}
+                />
+                {isStep && <span className="num">{l.omitted ? "–" : stepNo}</span>}
                 <LineText line={l} factor={factor} scale={!isStep} />
                 <button
                   className="btn ghost icon edit-btn"

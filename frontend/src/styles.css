@@ -670,7 +670,12 @@ label.field .hint {
 .line .tick {
   margin-top: 4px;
 }
-.line.done .text {
+.line .text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.line.done .text,
+.line.done .num {
   opacity: 0.4;
 }
 .line .orig.replaced,
@@ -736,7 +741,7 @@ label.field .hint {
 }
 
 .steps .line {
-  grid-template-columns: 2.2rem 1fr auto;
+  grid-template-columns: auto 2rem 1fr auto;
 }
 .steps .num {
   font-family: var(--font-ui);
@@ -762,6 +767,7 @@ label.field .hint {
 
 .notes-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 .note {
@@ -771,6 +777,8 @@ label.field .hint {
   border-radius: var(--r-md);
   padding: 12px 14px;
   white-space: pre-wrap;
+  /* Long links would otherwise widen the list past a phone's screen. */
+  overflow-wrap: anywhere;
 }
 .note footer {
   font-family: var(--font-ui);
@@ -1157,6 +1165,12 @@ pre.log {
   }
   .cook {
     grid-template-columns: 1fr 1.4fr;
+  }
+  .line {
+    grid-template-columns: 1fr;
+  }
+  .steps .line {
+    grid-template-columns: 2rem 1fr;
   }
 }
 
