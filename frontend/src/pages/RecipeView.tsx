@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   api,
@@ -12,7 +12,7 @@ import {
 } from "../api";
 import { HeartIcon, PencilIcon, PrinterIcon, SunIcon, TrashIcon } from "../components/icons";
 import { LineList } from "../components/Lines";
-import { useApi } from "../hooks";
+import { useApi, useWakeLock } from "../hooks";
 import { factorLabel, PRESET_FACTORS, scaleServings } from "../scale";
 
 function Scaler({ factor, setFactor }: { factor: number; setFactor: (f: number) => void }) {
@@ -271,14 +271,8 @@ export default function RecipeView() {
   const { data: recipe, setData, error, reload } = useApi<Recipe>(`/recipes/${id}`);
   const [factor, setFactor] = useState(1);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [awake, setAwake] = useState(false);
-  const wakeLock = useRef<WakeLockSentinel | null>(null);
-
-  useEffect(() => {
-    return () => {
-      wakeLock.current?.release();
-    };
-  }, []);
+  const awake = useWakeLock();
+  const [awakeHint, setAwakeHint] = useState(false);
 
   if (error) return <div className="alert error">{error}</div>;
   if (!recipe) return null;
@@ -290,22 +284,6 @@ export default function RecipeView() {
   };
   const patch = async (body: Record<string, unknown>) => {
     setData(await api.patch<Recipe>(`/recipes/${recipe.id}`, body));
-  };
-
-  const toggleAwake = async () => {
-    if (awake) {
-      await wakeLock.current?.release();
-      wakeLock.current = null;
-      setAwake(false);
-    } else if ("wakeLock" in navigator) {
-      try {
-        wakeLock.current = await navigator.wakeLock.request("screen");
-        setAwake(true);
-        wakeLock.current.addEventListener("release", () => setAwake(false));
-      } catch {
-        /* not allowed */
-      }
-    }
   };
 
   const hero = imageUrl(recipe.image);
@@ -373,16 +351,15 @@ export default function RecipeView() {
             <button className="btn icon" onClick={() => window.print()} aria-label="Print" title="Print">
               <PrinterIcon />
             </button>
-            {"wakeLock" in navigator && (
+            {(awake.supported || !window.isSecureContext) && (
               <button
-                className="btn icon"
-                onClick={toggleAwake}
-                aria-pressed={awake}
-                title={awake ? "Screen stays on" : "Keep screen on while cooking"}
-                aria-label="Keep screen on"
-                style={awake ? { color: "var(--cobalt)", borderColor: "var(--cobalt)" } : undefined}
+                className="btn"
+                onClick={() => (awake.supported ? awake.toggle() : setAwakeHint((v) => !v))}
+                aria-pressed={awake.active}
+                title={awake.active ? "Let the screen sleep again" : "Keep the screen on while you cook"}
+                style={awake.active ? { color: "var(--cobalt)", borderColor: "var(--cobalt)" } : undefined}
               >
-                <SunIcon />
+                <SunIcon /> {awake.active ? "Screen stays on" : "Keep screen on"}
               </button>
             )}
             {confirmDelete ? (
@@ -411,6 +388,11 @@ export default function RecipeView() {
               </button>
             )}
           </div>
+          {awakeHint && (
+            <p className="small muted no-print">
+              Browsers only allow keeping the screen on when Collander is opened over HTTPS.
+            </p>
+          )}
         </div>
         {hero && (
           <div className="hero">

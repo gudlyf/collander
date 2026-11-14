@@ -80,3 +80,86 @@ export function useQueue(enabled = true) {
 export function pokeQueue() {
   window.dispatchEvent(new Event("collander:queue"));
 }
+
+const WAKE_KEY = "collander:keep-screen-on";
+
+/**
+ * Keep the screen on while a page is open, if the person asked for it on this device.
+ *
+ * Browsers drop the lock whenever the page is hidden (switching apps, locking the phone),
+ * so it is taken again each time the page becomes visible. Only available over HTTPS.
+ */
+export function useWakeLock() {
+  const supported = typeof navigator !== "undefined" && "wakeLock" in navigator;
+  const [wanted, setWanted] = useState(() => {
+    try {
+      return localStorage.getItem(WAKE_KEY) === "on";
+    } catch {
+      return false;
+    }
+  });
+  const [active, setActive] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const sentinel = useRef<WakeLockSentinel | null>(null);
+  const pending = useRef(false);
+
+  useEffect(() => {
+    if (!supported || !wanted) return;
+    let stopped = false;
+    const acquire = async () => {
+      if (stopped || sentinel.current || pending.current) return;
+      if (document.visibilityState !== "visible") return;
+      pending.current = true;
+      try {
+        const s = await navigator.wakeLock.request("screen");
+        if (stopped) {
+          s.release();
+          return;
+        }
+        sentinel.current = s;
+        setActive(true);
+        s.addEventListener("release", () => {
+          if (sentinel.current === s) {
+            sentinel.current = null;
+            setActive(false);
+          }
+        });
+      } catch {
+        setActive(false); // refused (e.g. low battery); tapping the button tries again
+      } finally {
+        pending.current = false;
+      }
+    };
+    acquire();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") acquire();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      const s = sentinel.current;
+      sentinel.current = null;
+      s?.release();
+      setActive(false);
+    };
+  }, [supported, wanted, attempt]);
+
+  const remember = (on: boolean) => {
+    setWanted(on);
+    try {
+      localStorage.setItem(WAKE_KEY, on ? "on" : "off");
+    } catch {
+      /* private mode: works for this visit only */
+    }
+  };
+
+  /** Turn it off if it's on; otherwise turn it on (or retry if the browser refused). */
+  const toggle = () => {
+    if (active) remember(false);
+    else if (wanted) setAttempt((n) => n + 1);
+    else remember(true);
+  };
+
+  return { supported, active, toggle };
+}
