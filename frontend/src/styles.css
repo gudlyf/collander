@@ -742,6 +742,10 @@ label.field .hint {
 
 .steps .line {
   grid-template-columns: auto 2rem 1fr auto;
+  cursor: pointer;
+}
+.steps .modify-box {
+  cursor: auto;
 }
 .steps .num {
   font-family: var(--font-ui);
