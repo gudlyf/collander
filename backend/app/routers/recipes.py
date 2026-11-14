@@ -14,7 +14,7 @@ from ..auth import require_auth
 from ..db import get_db
 from ..models import Ingredient, Note, Recipe, Step, Tag, recipe_tags
 from ..schemas import Bundle, NoteOut, RecipeIn, RecipeList, RecipeOut
-from ..services import ai, images, search
+from ..services import ai, icons, images, search
 from ..services.recipes import (
     create_recipe,
     delete_recipe,
@@ -145,6 +145,7 @@ def list_recipes(
 def create(body: RecipeIn, db: Session = Depends(get_db)):
     r = create_recipe(db, body)
     db.commit()
+    icons.maybe_auto_icon(r.id)
     return to_out(_get(db, r.id))
 
 
@@ -208,7 +209,25 @@ async def upload_image(recipe_id: int, file: UploadFile = File(...), db: Session
     if not name:
         raise HTTPException(422, "That file is not a supported image.")
     images.delete_image(r.image)
-    r.image = name
+    r.image, r.image_generated = name, False
+    db.commit()
+    return to_out(_get(db, recipe_id))
+
+
+@router.post("/{recipe_id}/icon", response_model=RecipeOut)
+def make_icon(
+    recipe_id: int,
+    replace_photo: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """Make (or remake) this recipe's AI icon. Takes a few seconds to a minute."""
+    r = _get(db, recipe_id)
+    if r.image and not r.image_generated and not replace_photo:
+        raise HTTPException(409, "This recipe has a photo. Remove it first to use an icon.")
+    try:
+        icons.apply_icon(db, r, replace_photo=replace_photo)
+    except ai.AIError as e:
+        raise HTTPException(502, str(e)) from e
     db.commit()
     return to_out(_get(db, recipe_id))
 

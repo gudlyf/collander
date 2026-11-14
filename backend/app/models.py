@@ -55,6 +55,8 @@ class Recipe(Base):
     cook_time: Mapped[str | None] = mapped_column(String(100), nullable=True)
     total_time: Mapped[str | None] = mapped_column(String(100), nullable=True)
     image: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # True when ``image`` is an AI-made icon rather than a real photo.
+    image_generated: Mapped[bool] = mapped_column(Boolean, default=False)
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     favorite: Mapped[bool] = mapped_column(Boolean, default=False)
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -148,7 +150,7 @@ class ImportJob(Base):
     __tablename__ = "import_jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    kind: Mapped[str] = mapped_column(String(30))  # evernote | bundle
+    kind: Mapped[str] = mapped_column(String(30))  # evernote | bundle | ai-check | icons
     status: Mapped[str] = mapped_column(String(30), default="pending")
     # pending | parsed | running | done | failed
     filename: Mapped[str] = mapped_column(String(500))

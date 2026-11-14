@@ -58,6 +58,8 @@ class RecipeIn(BaseModel):
     # One of: existing stored image name (unchanged), an http(s) URL to download,
     # or a data: URI (used by bundles / Evernote). None removes the image.
     image: str | None = None
+    # The image is an AI-made icon (kept as PNG; replaced by any real photo).
+    image_generated: bool = False
     created_at: datetime | None = None
     # Set by importers only; not exposed in the editor.
     import_key: str | None = Field(default=None, exclude=True)
@@ -87,6 +89,7 @@ class RecipeSummary(BaseModel):
     title: str
     description: str
     image: str | None
+    image_generated: bool = False
     favorite: bool
     rating: int | None
     needs_review: bool
@@ -110,6 +113,7 @@ class RecipeOut(BaseModel):
     cook_time: str | None
     total_time: str | None
     image: str | None
+    image_generated: bool = False
     rating: int | None
     favorite: bool
     needs_review: bool
@@ -212,6 +216,30 @@ class AISettingsIn(BaseModel):
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     google_api_key: str | None = None
+
+
+class ImageSettingsOut(BaseModel):
+    provider: str
+    model: str | None
+    effective_model: str | None
+    auto: bool
+    base_url: str | None
+    steps: int
+    cfg_scale: float
+    # Whether icons can be made right now (provider chosen and its API key/model available).
+    ready: bool
+    problem: str | None = None
+    missing: int  # recipes with no image at all
+    generated: int  # recipes showing an AI icon
+
+
+class ImageSettingsIn(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    auto: bool | None = None
+    base_url: str | None = None
+    steps: int | None = Field(default=None, ge=1, le=150)
+    cfg_scale: float | None = Field(default=None, ge=0, le=30)
 
 
 class AuthStatus(BaseModel):

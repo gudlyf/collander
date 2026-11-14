@@ -47,6 +47,8 @@ export interface RecipeIn {
   steps: StepIn[];
   notes: { text: string }[];
   image: string | null;
+  /** The image is an AI-made icon, not a photo. */
+  image_generated?: boolean;
 }
 
 export interface Recipe extends Omit<RecipeIn, "ingredients" | "steps" | "notes"> {
@@ -63,6 +65,7 @@ export interface RecipeSummary {
   title: string;
   description: string;
   image: string | null;
+  image_generated?: boolean;
   favorite: boolean;
   rating: number | null;
   needs_review: boolean;
@@ -130,6 +133,20 @@ export interface AISettings {
   effective_model: string | null;
   keys: Record<string, "env" | "db" | "">;
   auto_tag: boolean;
+}
+
+export interface ImageSettings {
+  provider: "none" | "svg" | "a1111" | "openai" | "google";
+  model: string | null;
+  effective_model: string | null;
+  auto: boolean;
+  base_url: string | null;
+  steps: number;
+  cfg_scale: number;
+  ready: boolean;
+  problem: string | null;
+  missing: number;
+  generated: number;
 }
 
 export interface AuthStatus {
@@ -236,5 +253,6 @@ export function toInput(r: Recipe): RecipeIn {
     steps: r.steps.map(strip),
     notes: [],
     image: r.image,
+    image_generated: !!r.image_generated,
   };
 }

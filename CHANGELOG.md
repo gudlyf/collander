@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Recipe icons: recipes without a photo can get a simple AI-made icon in the style of the app's logo, drawn as SVG by the configured AI model (any provider, including Ollama), painted by a local Stable Diffusion server with the AUTOMATIC1111 API (A1111, Forge, sd-server), or by an OpenAI or Google image model. For painted icons, the AI model describes how the dish looks, then a vision-capable model checks each icon for stray text and for whether it shows the dish, repainting if needed. Make one per recipe, all missing ones at once from Settings, or automatically for new recipes. New settings `COLLANDER_IMAGE_PROVIDER`, `COLLANDER_IMAGE_MODEL`, `COLLANDER_IMAGE_BASE_URL`, `COLLANDER_IMAGE_STEPS` and `COLLANDER_IMAGE_CFG_SCALE`.
+- Settings shows the version and commit of the running build.
+- `COLLANDER_DATA_VOLUME` chooses the data volume or folder without editing `compose.yaml`.
+- Frontend dependency updates for security alerts (React Router 7, Vite 6.4, Vitest 5).
+
 ## 1.0.0 (2026-11-13)
 
 First release.

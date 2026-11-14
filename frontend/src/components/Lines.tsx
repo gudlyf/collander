@@ -50,7 +50,8 @@ function ModifyBox({
   onCancel: () => void;
   onDelete?: () => void;
 }) {
-  const [override, setOverride] = useState(line.override_text ?? (line.is_addition ? line.text : ""));
+  // Start from the current wording so a small change is a small edit.
+  const [override, setOverride] = useState(line.override_text ?? line.text);
   const [note, setNote] = useState(line.override_note ?? "");
   const [omitted, setOmitted] = useState(!!line.omitted);
   const Input = isStep ? "textarea" : "input";
@@ -59,9 +60,10 @@ function ModifyBox({
     if (line.is_addition) {
       onSave({ ...line, text: override.trim() || line.text, override_note: note.trim() || null });
     } else {
+      const changed = override.trim() && override.trim() !== line.text.trim();
       onSave({
         ...line,
-        override_text: override.trim() || null,
+        override_text: changed ? override.trim() : null,
         override_note: note.trim() || null,
         omitted,
       });
@@ -83,6 +85,9 @@ function ModifyBox({
           autoFocus
           rows={3}
           placeholder={line.is_addition ? "" : "Leave empty to use the original"}
+          onFocus={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+            e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)
+          }
           onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
             setOverride(e.target.value)
           }
@@ -174,26 +179,26 @@ export function LineList({ lines, kind, factor, onChange }: ListProps) {
                 className={`line ${done.has(i) ? "done" : ""} ${l.omitted ? "omitted" : ""} ${
                   l.is_addition ? "added" : ""
                 }`}
+                onClick={
+                  isStep
+                    ? (e) => {
+                        // A tap anywhere on a step ticks it, except on its own controls.
+                        const t = e.target as HTMLElement;
+                        if (t.closest("input, button, textarea, a, .modify-box")) return;
+                        if (window.getSelection()?.toString()) return; // selecting text to copy
+                        toggleDone(i);
+                      }
+                    : undefined
+                }
               >
-                {isStep ? (
-                  <button
-                    className="num btn ghost"
-                    style={{ padding: 0, border: 0, justifyContent: "flex-start" }}
-                    onClick={() => toggleDone(i)}
-                    aria-label={`Mark step ${stepNo} ${done.has(i) ? "not done" : "done"}`}
-                    aria-pressed={done.has(i)}
-                  >
-                    {l.omitted ? "–" : stepNo}
-                  </button>
-                ) : (
-                  <input
-                    type="checkbox"
-                    className="tick check"
-                    checked={done.has(i)}
-                    onChange={() => toggleDone(i)}
-                    aria-label={`Got ${l.text}`}
-                  />
-                )}
+                <input
+                  type="checkbox"
+                  className="tick check"
+                  checked={done.has(i)}
+                  onChange={() => toggleDone(i)}
+                  aria-label={isStep ? `Done with step ${l.omitted ? "" : stepNo}`.trim() : `Got ${l.text}`}
+                />
+                {isStep && <span className="num">{l.omitted ? "–" : stepNo}</span>}
                 <LineText line={l} factor={factor} scale={!isStep} />
                 <button
                   className="btn ghost icon edit-btn"

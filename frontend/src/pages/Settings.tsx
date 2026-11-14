@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type AISettings, type AuthStatus, type BuildInfo } from "../api";
+import { api, type AISettings, type AuthStatus, type BuildInfo, type ImageSettings } from "../api";
 import { useApi } from "../hooks";
 import { JobProgress } from "./Import";
 
@@ -204,6 +204,227 @@ function AIForm() {
   );
 }
 
+const ICON_ENGINES: [ImageSettings["provider"], string][] = [
+  ["none", "Off"],
+  ["svg", "Drawn by the AI model above"],
+  ["a1111", "Stable Diffusion server (AUTOMATIC1111 API)"],
+  ["openai", "OpenAI image model"],
+  ["google", "Google image model"],
+];
+
+function IconsForm() {
+  const { data, setData, reload } = useApi<ImageSettings>("/settings/images");
+  const ai = useApi<AISettings>("/settings/ai");
+  const defaults = useApi<{ default_models: Record<string, string> }>("/settings/images/defaults");
+  const [provider, setProvider] = useState<ImageSettings["provider"]>("none");
+  const [model, setModel] = useState("");
+  const [auto, setAuto] = useState(true);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [steps, setSteps] = useState("8");
+  const [cfgScale, setCfgScale] = useState("1");
+  const [key, setKey] = useState("");
+  const [redo, setRedo] = useState(false);
+  const [jobId, setJobId] = useState<number | null>(null);
+  const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setProvider(data.provider);
+    setModel(data.model ?? "");
+    setAuto(data.auto);
+    setBaseUrl(data.base_url ?? "");
+    setSteps(String(data.steps));
+    setCfgScale(String(data.cfg_scale));
+  }, [data]);
+
+  if (!data || !ai.data) return null;
+  const keyField = provider === "openai" || provider === "google" ? `${provider}_api_key` : null;
+  const hasKey = keyField ? !!ai.data.keys[provider] : true;
+  const placeholder =
+    provider === "svg"
+      ? (ai.data.effective_model ?? "the AI model above")
+      : provider === "a1111"
+        ? "the server's current model"
+        : defaults.data?.default_models[provider];
+  const count = data.missing + (redo ? data.generated : 0);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setStatus(null);
+    try {
+      if (keyField && key.trim()) {
+        ai.setData(await api.put<AISettings>("/settings/ai", { [keyField]: key.trim() }));
+        setKey("");
+      }
+      const body: Record<string, unknown> = { provider, model, auto };
+      if (provider === "a1111") {
+        body.base_url = baseUrl;
+        if (steps.trim()) body.steps = Number(steps);
+        if (cfgScale.trim()) body.cfg_scale = Number(cfgScale);
+      }
+      const next = await api.put<ImageSettings>("/settings/images", body);
+      setData(next);
+      setStatus(
+        next.provider === "none" || next.ready
+          ? { kind: "ok", text: "Saved." }
+          : { kind: "error", text: `Saved, but icons can't be made yet: ${next.problem}` },
+      );
+    } catch (err) {
+      setStatus({ kind: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setStatus(null);
+    try {
+      const res = await api.post<{ models: string[] }>("/settings/images/test");
+      setStatus({ kind: "ok", text: `Connected. Models: ${res.models.join(", ") || "none listed"}.` });
+    } catch (err) {
+      setStatus({ kind: "error", text: (err as Error).message });
+    }
+  };
+
+  const start = async () => {
+    setStatus(null);
+    try {
+      const job = await api.post<{ id: number }>("/import/icons", { scope: redo ? "all" : "missing" });
+      setJobId(job.id);
+    } catch (err) {
+      setStatus({ kind: "error", text: (err as Error).message });
+    }
+  };
+
+  return (
+    <form className="panel stack" onSubmit={save}>
+      <h2>Recipe icons</h2>
+      <p className="muted small">
+        Recipes without a photo can get a simple icon in the style of the Collander logo. A photo you add later always
+        replaces the icon.
+      </p>
+      <label className="field">
+        Made by
+        <select value={provider} onChange={(e) => setProvider(e.target.value as ImageSettings["provider"])}>
+          {ICON_ENGINES.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </label>
+      {provider !== "none" && (
+        <>
+          {provider === "svg" && (
+            <p className="small muted">
+              The AI model draws each icon as simple shapes. Works with every provider, including local models, and
+              costs about as much as a tag suggestion.
+            </p>
+          )}
+          {provider === "a1111" && (
+            <>
+              <label className="field">
+                Server address
+                <input
+                  type="url"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="http://host.docker.internal:7860"
+                />
+              </label>
+              <p className="small muted">
+                Any server with the AUTOMATIC1111 API: A1111, Forge, or stable-diffusion.cpp's{" "}
+                <code>sd-server</code>. Turbo models such as Z-Image Turbo want about 8 steps and CFG 1.
+              </p>
+              <div className="row">
+                <label className="field" style={{ flex: 1 }}>
+                  Steps
+                  <input type="number" min={1} max={150} value={steps} onChange={(e) => setSteps(e.target.value)} />
+                </label>
+                <label className="field" style={{ flex: 1 }}>
+                  CFG scale
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={0.5}
+                    value={cfgScale}
+                    onChange={(e) => setCfgScale(e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
+          <label className="field">
+            <span>
+              Model <span className="hint">(leave empty for {placeholder ?? "the default"})</span>
+            </span>
+            <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={placeholder} />
+          </label>
+          {keyField && !hasKey && (
+            <label className="field">
+              <span>
+                {provider === "openai" ? "OpenAI" : "Google"} API key{" "}
+                <span className="hint">(also used by the AI model setting)</span>
+              </span>
+              <input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} />
+            </label>
+          )}
+          <label className="check">
+            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+            Make an icon when I add a recipe without a photo
+          </label>
+          <p className="small muted">Bulk imports (backups, Evernote) don't make icons; use the button below.</p>
+        </>
+      )}
+      {status && <div className={`alert ${status.kind === "error" ? "error" : ""}`}>{status.text}</div>}
+      <div className="row">
+        <button className="btn primary" disabled={busy}>
+          Save
+        </button>
+        {data.provider === "a1111" && provider === "a1111" && (
+          <button type="button" className="btn" onClick={test} disabled={busy}>
+            Test connection
+          </button>
+        )}
+      </div>
+      {data.ready && data.provider === provider && (
+        <div className="stack" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+          {jobId ? (
+            <JobProgress
+              jobId={jobId}
+              onDone={() => {
+                reload();
+              }}
+            />
+          ) : (
+            <>
+              <p className="small">
+                {data.missing === 1 ? "1 recipe has" : `${data.missing} recipes have`} no photo or icon
+                {data.generated > 0 && `; ${data.generated} already ${data.generated === 1 ? "has an icon" : "have icons"}`}.
+              </p>
+              {data.generated > 0 && (
+                <label className="check">
+                  <input type="checkbox" checked={redo} onChange={(e) => setRedo(e.target.checked)} />
+                  Also replace existing icons
+                </label>
+              )}
+              <div className="row">
+                <button type="button" className="btn" disabled={count === 0} onClick={start}>
+                  Make {count} {count === 1 ? "icon" : "icons"}
+                </button>
+              </div>
+              <p className="small muted">Runs in the background, one recipe at a time. Photos are never replaced.</p>
+            </>
+          )}
+        </div>
+      )}
+    </form>
+  );
+}
+
 function PasswordForm({ fromEnv }: { fromEnv: boolean }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -285,6 +506,7 @@ export default function Settings({ auth }: { auth: AuthStatus }) {
       <h1>Settings</h1>
       <AIForm />
       <CheckRecipes />
+      <IconsForm />
       <div className="panel stack">
         <h2>Backup</h2>
         <p className="muted small">

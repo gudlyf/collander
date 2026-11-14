@@ -60,6 +60,7 @@ backend/app/
     enex.py            streaming .enex parser
     scraper.py         URL -> recipe (schema.org first, then AI)
     search.py          FTS5 index and query parser
+    icons.py           AI recipe icons (SVG allowlist + rasterizing, image models)
   migrations/          Alembic migrations
 frontend/src/
   pages/               screens

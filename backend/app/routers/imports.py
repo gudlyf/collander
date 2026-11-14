@@ -15,7 +15,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..models import ImportJob, Recipe
 from ..schemas import EnexNotePreview, EnexPreview, EnexRunRequest, ImportJobOut
-from ..services import importer
+from ..services import icons, importer
 from ..services.settings_store import load_ai_config
 
 router = APIRouter(prefix="/api/import", tags=["import"], dependencies=[Depends(require_auth)])
@@ -151,6 +151,36 @@ def start_ai_check(body: AICheckRequest, db: Session = Depends(get_db)):
     db.add(job)
     db.commit()
     importer.start_ai_check_job(job.id, ids)
+    return job
+
+
+class IconsRequest(BaseModel):
+    # missing: recipes with no image. all: also redo existing AI icons (never photos).
+    scope: Literal["missing", "all"] = "missing"
+
+
+@router.post("/icons", response_model=ImportJobOut)
+def start_icons(body: IconsRequest, db: Session = Depends(get_db)):
+    """Make AI icons for recipes without a photo, one at a time in the background."""
+    problem = icons.check_ready(load_ai_config(db), icons.load_image_config(db))
+    if problem:
+        raise HTTPException(409, problem)
+    if db.scalar(
+        select(ImportJob.id).where(ImportJob.kind == "icons", ImportJob.status == "running")
+    ):
+        raise HTTPException(409, "Icons are already being made.")
+    ids = icons.targets(db, body.scope)
+    job = ImportJob(
+        kind="icons",
+        status="running",
+        filename="recipes without a photo" if body.scope == "missing" else "icons (all)",
+        stored_path="",
+        total=len(ids),
+        use_ai=True,
+    )
+    db.add(job)
+    db.commit()
+    icons.start_job(job.id, ids)
     return job
 
 

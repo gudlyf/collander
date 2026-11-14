@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     google_api_key: str | None = None
     ollama_base_url: str = "http://host.docker.internal:11434"
 
+    # Recipe icons for recipes without a photo: none | svg | a1111 | openai | google.
+    # "svg" has the AI model above draw a simple vector icon; "a1111" calls a local
+    # Stable Diffusion server with the AUTOMATIC1111 API (A1111/Forge/sd-server);
+    # openai/google use an image-generation model with the API key configured above.
+    image_provider: str = "none"
+    image_model: str | None = None
+    image_base_url: str | None = None  # a1111 server, e.g. http://host.docker.internal:7860
+    image_steps: int = 8  # a1111 sampling steps (8 suits turbo models)
+    image_cfg_scale: float = 1.0  # a1111 CFG scale (1.0 suits turbo models)
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "collander.db"

@@ -363,14 +363,20 @@ export function JobProgress({ jobId, onDone }: { jobId: number; onDone?: () => v
               : job.status === "done"
                 ? "Check finished"
                 : `Check ${job.status}`
-            : job.status === "running"
-              ? "Importing…"
-              : job.status === "done"
-                ? "Import finished"
-                : `Import ${job.status}`}
+            : job.kind === "icons"
+              ? job.status === "running"
+                ? "Making icons…"
+                : job.status === "done"
+                  ? "Icons finished"
+                  : `Icons ${job.status}`
+              : job.status === "running"
+                ? "Importing…"
+                : job.status === "done"
+                  ? "Import finished"
+                  : `Import ${job.status}`}
         </strong>
         <span className="small muted">
-          {job.processed}/{job.total} processed · {job.imported} {job.kind === "ai-check" ? "checked" : "added"} ·{" "}
+          {job.processed}/{job.total} processed · {job.imported} {job.kind === "ai-check" ? "checked" : job.kind === "icons" ? "made" : "added"} ·{" "}
           {job.failed} failed
         </span>
       </div>
@@ -378,11 +384,16 @@ export function JobProgress({ jobId, onDone }: { jobId: number; onDone?: () => v
         <div style={{ width: `${pct}%` }} />
       </div>
       {job.log && <pre className="log">{job.log}</pre>}
-      {job.status === "done" && (
-        <Link to="/?review=1" className="btn small" style={{ justifySelf: "start" }}>
-          See imported recipes
-        </Link>
-      )}
+      {job.status === "done" &&
+        (job.kind === "icons" ? (
+          <Link to="/" className="btn small" style={{ justifySelf: "start" }}>
+            See recipes
+          </Link>
+        ) : (
+          <Link to="/?review=1" className="btn small" style={{ justifySelf: "start" }}>
+            See imported recipes
+          </Link>
+        ))}
     </div>
   );
 }
