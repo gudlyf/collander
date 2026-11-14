@@ -18,6 +18,7 @@ dependencies = [
     "pydantic-settings>=2.16.3",
     "python-multipart>=0.0.33",
     "recipe-scrapers>=15.13.0",
+    "resvg-py>=0.5.0",
     "sqlalchemy>=2.1.8",
     "uvicorn[standard]>=0.54.0",
 ]

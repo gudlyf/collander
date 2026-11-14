@@ -57,6 +57,7 @@ Only `title` is required. A bare JSON array of recipes is accepted too.
 | `notes` | `{text, created_at?}[]` | |
 | `original_text` | string | Shown under "Original imported text" |
 | `image` | string | An `http(s)` URL to download, or a `data:image/...;base64,` URI |
+| `image_generated` | bool | `true` when `image` is an AI-made recipe icon rather than a photo. Only honored for `data:` URIs; such icons are kept as PNG and replaced by any later photo. Default `false`. |
 | `created_at` | ISO datetime | Keeps the original date |
 
 A **line** (ingredient or step) is:

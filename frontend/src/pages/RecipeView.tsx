@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, imageUrl, toInput, type IngredientIn, type Note, type QueueItem, type Recipe } from "../api";
+import {
+  api,
+  imageUrl,
+  toInput,
+  type ImageSettings,
+  type IngredientIn,
+  type Note,
+  type QueueItem,
+  type Recipe,
+} from "../api";
 import { HeartIcon, PencilIcon, PrinterIcon, SunIcon, TrashIcon } from "../components/icons";
 import { LineList } from "../components/Lines";
 import { useApi } from "../hooks";
@@ -220,6 +229,42 @@ function AICheckButton({ recipe, onDone }: { recipe: Recipe; onDone: (r: Recipe)
   );
 }
 
+function IconButton({ recipe, onDone }: { recipe: Recipe; onDone: (r: Recipe) => void }) {
+  const cfg = useApi<ImageSettings>("/settings/images");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!cfg.data?.ready) return null;
+  if (recipe.image && !recipe.image_generated) return null; // a real photo wins
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await api.post<Recipe>(`/recipes/${recipe.id}/icon`));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        className="btn"
+        onClick={run}
+        disabled={busy}
+        title={recipe.image ? "Replace the AI icon with a new one" : "Make an AI icon for this recipe"}
+      >
+        {busy ? "Making icon…" : recipe.image ? "New icon" : "Make icon"}
+      </button>
+      {error && (
+        <div className="alert small error" style={{ flexBasis: "100%" }}>
+          {error}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function RecipeView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -324,6 +369,7 @@ export default function RecipeView() {
               <PencilIcon /> Edit
             </Link>
             <AICheckButton recipe={recipe} onDone={setData} />
+            <IconButton recipe={recipe} onDone={setData} />
             <button className="btn icon" onClick={() => window.print()} aria-label="Print" title="Print">
               <PrinterIcon />
             </button>

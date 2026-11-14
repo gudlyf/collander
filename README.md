@@ -16,6 +16,7 @@
 - **Change a recipe without losing the original.** Mark any ingredient or step as changed ("skim milk" → "almond milk", *dairy-free*), left out, or added. The original stays visible, crossed out, with your version beneath it.
 - **Scale with one tap.** ½×, 1×, 2×, 3× or any multiplier. Quantities like `1 1/2`, `½`, `2-3` and `1 (14 oz) can` are scaled and shown as kitchen fractions; lines like "salt to taste" are left alone.
 - **Notes.** Add dated notes to any recipe: what worked, what to try next time.
+- **Icons for recipes without photos.** Optional AI-made icons in the style of the app's logo, drawn by your AI model or an image model, one at a time or all at once.
 - **Tags, chosen by AI or by you.** The AI suggests tags and prefers tags you already use, so your vocabulary stays tidy. Rename or merge tags any time.
 - **Fast search.** Full-text search across titles, ingredients (original and modified), steps, notes and tags, ranked by relevance. See [search syntax](#search).
 - **Your choice of AI, or none.** Anthropic Claude, OpenAI (or any OpenAI-compatible server), Google Gemini, or a local model through Ollama. Everything except photo import works without AI.
@@ -98,6 +99,11 @@ All settings are optional environment variables (put them in `.env`). AI setting
 | `COLLANDER_OPENAI_BASE_URL` | – | For OpenAI-compatible servers (LM Studio, vLLM, OpenRouter…) |
 | `COLLANDER_GOOGLE_API_KEY` | – | Gemini API key |
 | `COLLANDER_OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Ollama address |
+| `COLLANDER_IMAGE_PROVIDER` | `none` | Recipe icons: `none`, `svg`, `a1111`, `openai`, `google` (see [Recipe icons](#recipe-icons)) |
+| `COLLANDER_IMAGE_MODEL` | engine default | Image model, or for `svg` a chat model other than the main one |
+| `COLLANDER_IMAGE_BASE_URL` | – | Stable Diffusion server address for `a1111` |
+| `COLLANDER_IMAGE_STEPS` | `8` | Sampling steps for `a1111` |
+| `COLLANDER_IMAGE_CFG_SCALE` | `1.0` | CFG scale for `a1111` |
 | `COLLANDER_DATA_DIR` | `/data` | Where the database and images live |
 | `COLLANDER_MAX_UPLOAD_BYTES` | 512 MB | Largest accepted upload (ENEX, bundles) |
 
@@ -111,6 +117,21 @@ All settings are optional environment variables (put them in `.env`). AI setting
 | Ollama | `llama3.1` | For photo import, pick a vision model such as `llama3.2-vision` or `qwen2.5vl`. |
 
 Model names change often; set the one you want on the Settings page. Use **Test connection** to check it.
+
+### Recipe icons
+
+Recipes without a photo can get a simple icon in the style of the Collander logo. Choose how they're made in **Settings → Recipe icons**:
+
+| Engine | Default model | Notes |
+| --- | --- | --- |
+| Drawn by the AI model (`svg`) | the AI model above | The chat model draws flat shapes, which Collander checks against an allowlist and turns into a PNG. Works with every provider, including Ollama. |
+| Stable Diffusion server (`a1111`) | the server's current model | Any server with the AUTOMATIC1111 API: A1111, Forge, or stable-diffusion.cpp's `sd-server`. Runs locally for free. Defaults (8 steps, CFG 1.0) suit turbo models such as Z-Image Turbo; use about 25 steps and CFG 5–7 for standard SDXL models. **Test connection** checks that the server is awake. |
+| OpenAI (`openai`) | `gpt-image-2` | Uses the OpenAI API key. |
+| Google (`google`) | `gemini-2.5-flash-image` | Uses the Google API key. Gemini image models are called through `generate_content`, `imagen-*` models through `generate_images`. Model names change often; set a current one if the default is retired. |
+
+Painted icons (every engine except `svg`) are checked for stray text by your AI model when it can read images, and repainted with a new seed up to twice if any shows up.
+
+New recipes added by hand or through the import queue get an icon automatically (you can turn that off). Bulk imports don't; use **Make icons** in Settings to fill in every recipe without a photo, or **Make icon** / **New icon** on a recipe. A photo always replaces the icon, and icons are included in backups.
 
 **Ollama on the same machine:** the default address `http://host.docker.internal:11434` reaches Ollama running on the Docker host (the compose file maps it on Linux too). Or run Ollama in the same stack with `docker compose --profile ollama up -d` and set the address to `http://ollama:11434`.
 

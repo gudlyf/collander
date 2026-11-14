@@ -43,6 +43,16 @@ class FakeAI(list):
             return {"tags": ["Soup", "vegetarian", "soup"]}
         if name == "review":
             return self.review(user)
+        if name == "icon":
+            return {
+                "subject": "a bowl of soup",
+                "svg": (
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+                    '<path d="M120 240h272c0 90-60 150-136 150S120 330 120 240z" fill="#F6F7F4"/>'
+                    '<rect x="110" y="220" width="292" height="30" rx="15" fill="#14213D"/>'
+                    "</svg>"
+                ),
+            }
         return {
             "is_recipe": True,
             "title": "Fake Soup",
@@ -66,6 +76,7 @@ def fake_ai(monkeypatch):
 
     fake = FakeAI()
     monkeypatch.setattr(tasks, "get_provider", lambda cfg: fake)
+    monkeypatch.setattr("app.services.icons.get_provider", lambda cfg: fake)
     real = settings_store.load_ai_config
 
     def enabled_cfg(db):
@@ -80,6 +91,8 @@ def fake_ai(monkeypatch):
         "app.routers.imports",
         "app.routers.recipes",
         "app.services.importer",
+        "app.services.icons",
+        "app.routers.settings",
     ):
         monkeypatch.setattr(f"{mod}.load_ai_config", enabled_cfg, raising=False)
     return fake

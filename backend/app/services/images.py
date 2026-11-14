@@ -25,19 +25,23 @@ def is_stored_name(value: str | None) -> bool:
     return bool(value and _NAME_RE.match(value))
 
 
-def save_image_bytes(data: bytes) -> str | None:
-    """Normalize to JPEG/PNG (max 1600px) and store. Returns the stored file name."""
+def save_image_bytes(data: bytes, *, png: bool = False, max_dim: int = MAX_DIM) -> str | None:
+    """Normalize to JPEG/PNG and store. Returns the stored file name.
+
+    Photos become JPEG unless they have transparency; ``png=True`` keeps flat artwork
+    (AI icons) as PNG so solid colours stay crisp.
+    """
     if not data or len(data) > MAX_BYTES:
         return None
     try:
         img = Image.open(io.BytesIO(data))
         img = ImageOps.exif_transpose(img)
-        img.thumbnail((MAX_DIM, MAX_DIM))
+        img.thumbnail((max_dim, max_dim))
     except Exception as e:  # noqa: BLE001 - any decode failure just means "no image"
         log.info("Could not decode image: %s", e)
         return None
     has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
-    ext = "png" if has_alpha else "jpg"
+    ext = "png" if (has_alpha or png) else "jpg"
     name = f"{uuid.uuid4().hex}.{ext}"
     path = get_settings().images_dir / name
     if ext == "jpg":
@@ -62,24 +66,24 @@ def save_image_from_url(url: str) -> str | None:
         return None
 
 
-def save_image_from_data_uri(uri: str) -> str | None:
+def save_image_from_data_uri(uri: str, *, png: bool = False) -> str | None:
     m = re.match(r"^data:image/[\w.+-]+;base64,(.*)$", uri, re.DOTALL)
     if not m:
         return None
     try:
-        return save_image_bytes(base64.b64decode(m.group(1)))
+        return save_image_bytes(base64.b64decode(m.group(1)), png=png)
     except ValueError:
         return None
 
 
-def resolve_image(value: str | None) -> str | None:
+def resolve_image(value: str | None, *, png: bool = False) -> str | None:
     """Turn an incoming image reference into a stored image name (or None)."""
     if not value:
         return None
     if is_stored_name(value):
         return value if (get_settings().images_dir / value).exists() else None
     if value.startswith("data:"):
-        return save_image_from_data_uri(value)
+        return save_image_from_data_uri(value, png=png)
     if value.startswith(("http://", "https://")):
         return save_image_from_url(value)
     return None

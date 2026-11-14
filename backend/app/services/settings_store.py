@@ -21,6 +21,15 @@ DEFAULT_MODELS = {
 }
 
 
+IMAGE_PROVIDERS = ("none", "svg", "a1111", "openai", "google")
+
+# Image-generation defaults. For "svg" the model is the chat model above unless overridden.
+DEFAULT_IMAGE_MODELS = {
+    "openai": "gpt-image-2",
+    "google": "gemini-2.5-flash-image",
+}
+
+
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
     row = db.get(AppSetting, key)
     return row.value if row else default
@@ -93,4 +102,40 @@ def load_ai_config(db: Session) -> AIConfig:
         google_api_key=pick("google_api_key"),
         ollama_base_url=get_value(db, "ollama_base_url") or s.ollama_base_url,
         auto_tag=(get_value(db, "auto_tag", "true") == "true"),
+    )
+
+
+@dataclass
+class ImageConfig:
+    provider: str
+    model: str | None
+    auto: bool
+    base_url: str | None = None
+    steps: int = 8
+    cfg_scale: float = 1.0
+
+    @property
+    def effective_model(self) -> str | None:
+        return self.model or DEFAULT_IMAGE_MODELS.get(self.provider)
+
+
+def load_image_config(db: Session) -> ImageConfig:
+    s = get_settings()
+    provider = get_value(db, "image_provider") or s.image_provider or "none"
+    if provider not in IMAGE_PROVIDERS:
+        provider = "none"
+
+    def number(key: str, default: float, cast):
+        try:
+            return cast(get_value(db, key) or default)
+        except ValueError:
+            return cast(default)
+
+    return ImageConfig(
+        provider=provider,
+        model=get_value(db, "image_model") or s.image_model,
+        auto=(get_value(db, "auto_icons", "true") == "true"),
+        base_url=get_value(db, "image_base_url") or s.image_base_url,
+        steps=number("image_steps", s.image_steps, int),
+        cfg_scale=number("image_cfg_scale", s.image_cfg_scale, float),
     )

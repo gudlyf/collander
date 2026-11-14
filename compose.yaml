@@ -26,6 +26,11 @@ services:
       COLLANDER_OPENAI_BASE_URL: ${COLLANDER_OPENAI_BASE_URL:-}
       COLLANDER_GOOGLE_API_KEY: ${COLLANDER_GOOGLE_API_KEY:-}
       COLLANDER_OLLAMA_BASE_URL: ${COLLANDER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      COLLANDER_IMAGE_PROVIDER: ${COLLANDER_IMAGE_PROVIDER:-none}
+      COLLANDER_IMAGE_MODEL: ${COLLANDER_IMAGE_MODEL:-}
+      COLLANDER_IMAGE_BASE_URL: ${COLLANDER_IMAGE_BASE_URL:-}
+      COLLANDER_IMAGE_STEPS: ${COLLANDER_IMAGE_STEPS:-8}
+      COLLANDER_IMAGE_CFG_SCALE: ${COLLANDER_IMAGE_CFG_SCALE:-1.0}
     # Lets the container reach Ollama running on the host (needed on Linux).
     extra_hosts:
       - "host.docker.internal:host-gateway"

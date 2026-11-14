@@ -19,7 +19,7 @@ from sqlalchemy import select, update
 from ..config import get_settings
 from ..db import session_scope
 from ..models import QueueItem, utcnow
-from . import ai, scraper
+from . import ai, icons, scraper
 from .fetch import FetchError
 from .importer import to_data_uri
 from .recipes import create_recipe
@@ -102,6 +102,8 @@ def _process(item_id: int) -> None:
             item.warnings_json = json.dumps(warnings)
             item.error = None
             item.finished_at = utcnow()
+            recipe_id = r.id
+        icons.maybe_auto_icon(recipe_id)
     except (FetchError, ai.AIError, RuntimeError, KeyError) as e:
         _fail(item_id, str(e))
     except Exception as e:

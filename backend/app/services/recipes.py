@@ -20,6 +20,7 @@ def to_summary(r: Recipe) -> RecipeSummary:
         title=r.title,
         description=r.description,
         image=r.image,
+        image_generated=r.image_generated,
         favorite=r.favorite,
         rating=r.rating,
         needs_review=r.needs_review,
@@ -60,11 +61,12 @@ def to_in(r: Recipe, *, embed_image: bool = False) -> RecipeIn:
         steps=[StepIn.model_validate(s, from_attributes=True) for s in r.steps],
         notes=[NoteIn(text=n.text, created_at=n.created_at) for n in r.notes],
         image=images.image_as_data_uri(r.image) if embed_image else None,
+        image_generated=bool(r.image_generated and embed_image),
         created_at=r.created_at,
     )
 
 
-def _apply(db: Session, r: Recipe, data: RecipeIn, *, replace_notes: bool) -> None:
+def _apply(db: Session, r: Recipe, data: RecipeIn, *, replace_notes: bool, new: bool) -> None:
     for field in (
         "title",
         "description",
@@ -82,12 +84,19 @@ def _apply(db: Session, r: Recipe, data: RecipeIn, *, replace_notes: bool) -> No
     ):
         setattr(r, field, getattr(data, field))
 
-    # Image: keep, replace or remove.
+    # Image: keep, replace or remove. A changed image is a photo, except an AI icon
+    # restored from a backup (a flagged data URI on a new recipe). Edits never set the flag.
+    if not new and data.image is None and r.image_generated and not data.image_generated:
+        # A page loaded before a background icon arrived saves "no image"; keep the icon.
+        # (A client that saw the icon sends image_generated=true when removing it.)
+        data = data.model_copy(update={"image": r.image})
     if data.image != r.image:
-        new_name = images.resolve_image(data.image)
+        generated = new and data.image_generated and (data.image or "").startswith("data:")
+        new_name = images.resolve_image(data.image, png=generated)
         if new_name != r.image:
             images.delete_image(r.image)
             r.image = new_name
+            r.image_generated = bool(new_name) and generated
 
     r.ingredients = [
         Ingredient(position=i, **ing.model_dump()) for i, ing in enumerate(data.ingredients)
@@ -106,7 +115,7 @@ def create_recipe(db: Session, data: RecipeIn) -> Recipe:
     if data.created_at:
         r.created_at = data.created_at
     db.add(r)
-    _apply(db, r, data, replace_notes=True)
+    _apply(db, r, data, replace_notes=True, new=True)
     db.flush()
     search.index_recipe(db, r)
     return r
@@ -114,7 +123,7 @@ def create_recipe(db: Session, data: RecipeIn) -> Recipe:
 
 def update_recipe(db: Session, r: Recipe, data: RecipeIn) -> Recipe:
     # Notes are managed through their own endpoints, so the editor doesn't clobber them.
-    _apply(db, r, data, replace_notes=False)
+    _apply(db, r, data, replace_notes=False, new=False)
     db.flush()
     search.index_recipe(db, r)
     return r
